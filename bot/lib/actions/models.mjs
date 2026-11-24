@@ -80,7 +80,7 @@ export async function openModelFavorites(ctx, chatId, editId) {
   const favorites = favoriteModels(ctx.store, models);
   if (!favorites.length) {
     const message = favoriteCount(ctx.store)
-      ? "В избранном есть модели, но текущий ключ их не показывает. Смени коннект."
+      ? "Избранные модели скрыты или недоступны на этом ключе. Проверь 🙈 Скрытые или смени коннект."
       : "В избранном пока пусто. Открой «Все модели» и нажми ☆.";
     await ctx.tg.send(chatId, message);
     return openModel(ctx, chatId, editId);
