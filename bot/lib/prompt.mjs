@@ -143,6 +143,8 @@ export async function runPrompt(ctx, chatId, text, options = {}) {
     const head = parts.slice(0, 4).join("\n");
     const body = parts.slice(4).join("\n");
     await ctx.tg.send(chatId, `${head}\n${body}`);
+    ctx.lastPromptReports ??= {};
+    ctx.lastPromptReports[sessionId] = Date.now();
   } catch (error) {
     const message = friendlyError(error);
     if (progressId) await ctx.tg.edit(chatId, progressId, `❌ <b>Ошибка</b>\n${esc(clip(message, 1800))}`).catch(() => {});

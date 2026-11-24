@@ -1,5 +1,7 @@
 import { agentsView, dirsView, modelsView, providersView, variantsView } from "../ui.mjs";
 import { esc, fmtDate, modelTitle, sessionTitle } from "../format.mjs";
+import { friendlyError } from "../opencode.mjs";
+import { decorate, modelRef, visible } from "../prefs.mjs";
 import { PAGE, client, chatOf, sendView } from "./shared.mjs";
 import { showMain } from "./sessions.mjs";
 
@@ -30,11 +32,11 @@ export async function pickDir(ctx, chatId, index, editId) {
   if (!directory) return openNew(ctx, chatId, editId);
   chat.wizard ??= {};
   chat.wizard.directory = directory;
-  const models = await oc.models();
+  const models = decorate(ctx.store, await oc.models());
   const providers = await oc.providers().catch(() => []);
   const names = Object.fromEntries(providers.map((p) => [p.id, p.name]));
   const counts = {};
-  for (const model of models) counts[model.providerID] = (counts[model.providerID] || 0) + 1;
+  for (const model of visible(ctx.store, models)) counts[model.providerID] = (counts[model.providerID] || 0) + 1;
   const items = Object.keys(counts)
     .map((id) => ({ id, name: names[id] || id, count: counts[id] }))
     .sort((a, b) => b.count - a.count);
@@ -47,16 +49,19 @@ export async function pickProvider(ctx, chatId, index, editId, source = "new") {
   const chat = chatOf(ctx, chatId);
   const item = chat.menu?.providers?.[index];
   if (!item) return showMain(ctx, chatId, editId);
-  const models = (chat.menu.models || []).filter((model) => model.providerID === item.id);
+  const models = (chat.menu.models || [])
+    .filter((model) => model.providerID === item.id && !model.hidden)
+    .sort((a, b) => Number(b.favorite) - Number(a.favorite));
   chat.menu = {
     kind: "models",
     source,
     provider: item.id,
     title: source === "new" ? "Шаг 2/3. Модель" : "Модель сессии",
-    subtitle: `${item.name} · ${models.length}`,
+    subtitle: `${item.name} · ${models.length} · ⭐ сверху`,
     prefix: source === "new" ? "nm" : "mm",
     models,
     page: 0,
+    back: source === "new" ? "home" : "model",
   };
   ctx.store.save();
   await renderModelsPage(ctx, chatId, 0, editId);
@@ -75,7 +80,7 @@ export async function renderModelsPage(ctx, chatId, page, editId) {
   await sendView(
     ctx,
     chatId,
-    modelsView({ items, page: safe, prefix: menu.prefix, title: menu.title, subtitle: menu.subtitle }),
+    modelsView({ items, page: safe, prefix: menu.prefix, title: menu.title, subtitle: menu.subtitle, back: menu.back ?? "home" }),
     editId,
   );
 }
@@ -111,14 +116,14 @@ export async function pickVariant(ctx, chatId, index, editId, source = "new") {
 async function applyModelChoice(ctx, chatId, model, source, editId) {
   const chat = chatOf(ctx, chatId);
   if (source === "new") {
-    chat.wizard.model = model;
+    chat.wizard.model = modelRef(model);
     await openNewAgents(ctx, chatId, editId);
     return;
   }
   const oc = await client(ctx, chatId);
   if (!oc || !chat.activeSession) return;
   try {
-    await oc.setModel(chat.activeSession, model);
+    await oc.setModel(chat.activeSession, modelRef(model));
     chat.menu = null;
     ctx.store.save();
     await ctx.tg.send(chatId, `🧠 Модель: <code>${esc(modelTitle(model))}</code>${model.variant ? ` · ${esc(model.variant)}` : ""}`);
@@ -151,7 +156,7 @@ async function createWizardSession(ctx, chatId, editId) {
   if (!oc) return;
   const chat = chatOf(ctx, chatId);
   const wizard = chat.wizard || {};
-  const model = wizard.model || ctx.config.defaultModel;
+  const model = modelRef(wizard.model || ctx.config.defaultModel);
   try {
     const session = await oc.createSession({
       title: `TG · ${fmtDate(Date.now())}`,

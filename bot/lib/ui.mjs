@@ -87,24 +87,6 @@ export function providersView({ items, prefix, title }) {
   };
 }
 
-export function modelsView({ items, page, prefix, title, subtitle, hasNext }) {
-  const lines = [`<b>${esc(title)}</b>`];
-  if (subtitle) lines.push(esc(subtitle));
-  items.forEach((model, index) => {
-    const variants = model.variants?.length ? ` · ${model.variants.map((v) => v.id).join("/")}` : "";
-    lines.push(`${index + 1}. <code>${esc(clip(model.id, 54))}</code>${esc(variants)}`);
-  });
-  const rows = items.map((model, index) => [
-    { text: `${index + 1}. ${modelTitle(model)}`, callback_data: `${prefix}:${index}` },
-  ]);
-  rows.push([
-    { text: "⬅️", callback_data: `pg:${Math.max(0, page - 1)}` },
-    { text: "➡️", callback_data: `pg:${page + 1}` },
-  ]);
-  rows.push([{ text: "✖️ Отмена", callback_data: "home" }]);
-  return { text: lines.join("\n"), keyboard: kb(rows) };
-}
-
 export function variantsView({ items, prefix, model }) {
   const rows = [];
   for (let i = 0; i < items.length; i += 3) {
@@ -208,33 +190,6 @@ export function gitLogView({ title, text }) {
   };
 }
 
-export function reportView({ session, messages, gitInfo, cwd }) {
-  const tokens = session.tokens ?? {};
-  const last = messages.find((m) => m.type === "assistant" && assistantView(m).text);
-  const answer = last ? assistantView(last).text : "";
-  const lines = [
-    `<b>📊 Отчёт</b>`,
-    `<b>${esc(sessionTitle(session))}</b>`,
-    `Папка: <code>${esc(clip(session.location?.directory ?? cwd, 80))}</code>`,
-    `Модель: <code>${esc(modelLabel(session.model))}</code> · агент <code>${esc(session.agent ?? "—")}</code>`,
-    `Токены: ${fmtTokens(tokens.input)} in · ${fmtTokens(tokens.output)} out · ${fmtTokens(tokens.reasoning)} reasoning`,
-    `Стоимость: <b>${fmtCost(session.cost)}</b>`,
-    `Создана: ${fmtDate(session.time?.created)} · обновлена: ${fmtDate(session.time?.updated)}`,
-  ];
-  if (gitInfo?.repo) {
-    lines.push(`Git: <code>${esc(gitInfo.branch)}</code> · изменений ${gitInfo.dirty}`);
-  }
-  if (answer) lines.push(`\n<b>Последний ответ</b>\n${esc(clip(answer, 1200))}`);
-  else lines.push("\nПоследнего текстового ответа нет.");
-  return {
-    text: lines.join("\n"),
-    keyboard: kb([
-      [{ text: "🔄 Обновить", callback_data: "report" }, { text: "🌿 Git", callback_data: "git" }],
-      home,
-    ]),
-  };
-}
-
 export function statusView({ service, session, activeMap, stats, freeGb }) {
   const tokens = stats?.tokens ?? {};
   const lines = [
@@ -302,3 +257,6 @@ export function confirmDelete({ session }) {
     ]),
   };
 }
+
+export { modelsView, hiddenView, modelHomeView, connectionPickerView } from "./ui-models.mjs";
+export { reportView, finishView, liveView } from "./ui-reports.mjs";

@@ -88,6 +88,14 @@ export class Telegram {
     await this.call("setMyCommands", { commands });
   }
 
+  async pinChatMessage(chatId, messageId) {
+    await this.call("pinChatMessage", {
+      chat_id: chatId,
+      message_id: messageId,
+      disable_notification: true,
+    });
+  }
+
   async getMe() {
     return this.call("getMe");
   }

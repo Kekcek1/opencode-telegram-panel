@@ -22,6 +22,9 @@ export class Store {
     this.data.chats ??= {};
     this.data.offset ??= 0;
     this.data.servicePath ??= null;
+    this.data.modelPrefs ??= { favorites: [], hidden: [] };
+    this.data.live ??= { chatId: null, messageId: null, pinned: false };
+    this.data.monitor ??= { sessions: {} };
   }
 
   save() {

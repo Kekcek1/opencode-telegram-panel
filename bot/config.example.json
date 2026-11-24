@@ -16,5 +16,7 @@
   "gitExe": "git",
   "repos": [],
   "promptTimeoutMs": 900000,
-  "progressIntervalMs": 5000
+  "progressIntervalMs": 5000,
+  "presenceIntervalMs": 8000,
+  "liveIntervalMs": 20000
 }

@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { Store, loadJson } from "./lib/store.mjs";
 import { Telegram } from "./lib/telegram.mjs";
 import { ServiceManager } from "./lib/opencode.mjs";
+import { Presence } from "./lib/presence.mjs";
 import { handleUpdate } from "./lib/handlers.mjs";
 import { sleep } from "./lib/format.mjs";
 
@@ -60,6 +61,7 @@ store.save();
 const service = new ServiceManager(config, store);
 const tg = new Telegram(config.token);
 const ctx = { config, store, service, tg, log };
+ctx.presence = new Presence(ctx);
 
 const commands = [
   { command: "start", description: "Главное меню" },
@@ -86,6 +88,8 @@ async function main() {
   });
   log(`started pid=${process.pid} bot=@${me?.username ?? "?"} user=${config.allowedUsername ?? "?"}`);
   await tg.setCommands(commands).catch((error) => log(`setCommands failed: ${error.message}`));
+  const firstChat = Object.keys(store.data.chats)[0];
+  if (firstChat) ctx.presence.start(firstChat);
 
   for (;;) {
     try {

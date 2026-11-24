@@ -4,6 +4,7 @@ import * as actions from "./actions.mjs";
 import { runPrompt } from "./prompt.mjs";
 import { fmtDate, esc } from "./format.mjs";
 import { friendlyError } from "./opencode.mjs";
+import { modelRef } from "./prefs.mjs";
 
 function allowed(config, from) {
   const id = config.allowedId ? String(config.allowedId) : "";
@@ -50,9 +51,10 @@ async function quickTask(ctx, chatId, text) {
   }
   const oc = await ctx.service.client();
   const models = await oc.models();
-  const model =
+  const found =
     models.find((item) => item.providerID === ctx.config.defaultModel.providerID && item.id === ctx.config.defaultModel.id) ||
     models.find((item) => item.enabled);
+  const model = found ? modelRef(found) : ctx.config.defaultModel;
   const agent = ctx.config.defaultAgent || "build";
   const session = await oc.createSession({
     title: `TG task · ${fmtDate(Date.now())}`,
@@ -78,7 +80,9 @@ async function command(ctx, msg, chatId, parsed) {
     case "start":
     case "home":
     case "menu":
-      return actions.showMain(ctx, chatId);
+      await actions.showMain(ctx, chatId);
+      ctx.presence?.start(chatId);
+      return;
     case "help":
       return actions.showHelp(ctx, chatId);
     case "id":
@@ -114,6 +118,12 @@ async function command(ctx, msg, chatId, parsed) {
     case "connections":
     case "conn":
       return actions.openConnections(ctx, chatId);
+    case "favorites":
+      return actions.openModelFavorites(ctx, chatId);
+    case "live":
+      if (!ctx.presence) return ctx.tg.send(chatId, "Live-панель ещё не запущена.");
+      await ctx.presence.refresh(chatId);
+      return ctx.tg.send(chatId, "📌 Live-панель обновлена.");
     case "service":
       return actions.openService(ctx, chatId);
     case "btw":
@@ -182,6 +192,17 @@ async function callback(ctx, query) {
   if (head === "nv") return actions.pickVariant(ctx, chatId, index, editId, "new");
   if (head === "na") return actions.pickNewAgent(ctx, chatId, index, editId);
   if (head === "model") return actions.openModel(ctx, chatId, editId);
+  if (head === "mfav") return actions.openModelFavorites(ctx, chatId, editId);
+  if (head === "mall") return actions.openModelAll(ctx, chatId, editId);
+  if (head === "mhidden") return actions.openHidden(ctx, chatId, editId);
+  if (head === "fav") return actions.toggleFavoriteModel(ctx, chatId, index, editId);
+  if (head === "hid") return actions.toggleHiddenModel(ctx, chatId, index, editId);
+  if (head === "cc" && tail === "list") return actions.openConnectionPicker(ctx, chatId, editId);
+  if (head === "cc") return actions.selectConnection(ctx, chatId, index, editId);
+  if (head === "live") return ctx.presence?.refresh(chatId);
+  if (head === "rpt") return actions.openReportFor(ctx, chatId, tail, editId);
+  if (head === "opn") return actions.openSessionById(ctx, chatId, tail, editId);
+  if (head === "rep") return actions.openReportFor(ctx, chatId, tail, editId);
   if (head === "mp") return actions.pickProvider(ctx, chatId, index, editId, "set");
   if (head === "mm") return actions.pickModel(ctx, chatId, index, editId, "set");
   if (head === "mv") return actions.pickVariant(ctx, chatId, index, editId, "set");
@@ -189,6 +210,7 @@ async function callback(ctx, query) {
   if (head === "ma") return actions.pickSetAgent(ctx, chatId, index, editId);
   if (head === "pg") {
     if (chat.menu?.kind === "models") return actions.renderModelsPage(ctx, chatId, Number(tail) || 0, editId);
+    if (chat.menu?.kind === "hidden") return actions.renderHiddenPage(ctx, chatId, Number(tail) || 0, editId);
     if (chat.menu?.kind === "sessions") return actions.openSessions(ctx, chatId, Number(tail) || 0, editId);
     return actions.showMain(ctx, chatId, editId);
   }

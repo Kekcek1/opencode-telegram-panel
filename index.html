@@ -484,6 +484,7 @@
           </div>
           <ul class="hero-points">
             <li>Сессии общие с ПК</li>
+            <li>Live-панель</li>
             <li>Git без окон входа</li>
             <li>/btw и отчёты</li>
           </ul>
@@ -530,8 +531,8 @@
         <div class="stats reveal">
           <div class="stat"><strong>PC ↔ TG</strong><span>одни и те же сессии</span></div>
           <div class="stat"><strong>114</strong><span>моделей в меню</span></div>
-          <div class="stat"><strong>0 окон</strong><span>бот работает в фоне</span></div>
-          <div class="stat"><strong>/btw</strong><span>вклинивание в работу</span></div>
+          <div class="stat"><strong>LIVE</strong><span>закреплённая панель</span></div>
+          <div class="stat"><strong>⭐</strong><span>избранные модели</span></div>
         </div>
       </div>
     </section>
@@ -582,6 +583,18 @@
             <h3>Белый список и никакого shell</h3>
             <p>Только numeric ID владельца. Бот не выполняет произвольные команды: HTTP API OpenCode и фиксированные Git-операции.</p>
             <span class="chip">fail closed</span>
+          </article>
+          <article class="card wide reveal">
+            <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v12H4z"/><path d="M8 21h8"/><path d="M12 17v4"/><path d="M8 9h8"/></svg></div>
+            <h3>Live-панель и уведомления</h3>
+            <p>Закреплённое сообщение показывает, кто работает, какая модель и когда был апдейт. Когда сессия завершилась — приходит карточка с отчётом, даже если задача была запущена на ПК.</p>
+            <span class="chip">/live · auto</span>
+          </article>
+          <article class="card wide reveal">
+            <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3 6.4 20.2l1.1-6.2L3 9.6l6.2-.9L12 3Z"/></svg></div>
+            <h3>Избранное и скрытые модели</h3>
+            <p>Отметь звёздочкой нужные модели и убери лишние. Избранное общее для всех ключей CommandCode, а переключение <code>Command My</code> / <code>Comande Team</code> — в том же меню.</p>
+            <span class="chip">/favorites · ☆ → ⭐</span>
           </article>
         </div>
       </div>
@@ -660,8 +673,10 @@ status.cmd</span></pre>
               <tr><td><code>/start</code></td><td>Главное меню: сессия, модель, агент, Git, отчёт.</td></tr>
               <tr><td><code>/sessions</code></td><td>Список сессий, выбор активной, «взять с ПК».</td></tr>
               <tr><td><code>/new</code></td><td>Новая сессия: папка → провайдер → модель → агент.</td></tr>
-              <tr><td><code>/model</code></td><td>Сменить модель; <code>/model deepseek</code> — поиск.</td></tr>
+              <tr><td><code>/model</code></td><td>Модели, избранное, скрытые, коннект; <code>/model deepseek</code> — поиск.</td></tr>
+              <tr><td><code>/favorites</code></td><td>Только избранные модели.</td></tr>
               <tr><td><code>/agent</code>, <code>/plan</code></td><td>Сменить агента или план.</td></tr>
+              <tr><td><code>/live</code></td><td>Обновить закреплённую live-панель активных сессий.</td></tr>
               <tr><td><code>/task текст</code></td><td>Быстрая задача с телефона; создаст сессию при необходимости.</td></tr>
               <tr><td><code>/btw текст</code></td><td>Вклиниться в текущую работу через <code>delivery: steer</code>.</td></tr>
               <tr><td><code>/report</code></td><td>Токены, стоимость, модель, последний ответ, Git.</td></tr>
@@ -717,6 +732,8 @@ status.cmd</span></pre>
           <details class="reveal"><summary>Нужен хостинг или облако?</summary><p>Нет. Бот работает на том же ПК, где запущен OpenCode. Telegram используется только как интерфейс.</p></details>
           <details class="reveal"><summary>Что если запущено несколько OpenCode?</summary><p>В главном меню виден URL активного сервиса. Команда <code>/service</code> показывает все доступные <code>service.json</code> и переключает бота.</p></details>
           <details class="reveal"><summary>Бот может выполнить любую команду на ПК?</summary><p>Нет. Он умеет только вызывать API OpenCode и фиксированные Git-команды. Произвольный shell из Telegram запрещён.</p></details>
+          <details class="reveal"><summary>Как работают уведомления о завершении?</summary><p>Бот следит за активными сессиями через тот же сервис OpenCode. Когда сессия перестаёт работать, приходит карточка с моделью, временем, токенами, стоимостью и последним ответом. Это работает и для задач, запущенных на ПК.</p></details>
+          <details class="reveal"><summary>Избранное общее для разных ключей?</summary><p>Да. Избранное и скрытые модели хранятся по <code>provider/model</code>, поэтому не зависят от активного ключа. Переключение <code>Command My</code> / <code>Comande Team</code> меняет доступные модели, но звёздочки остаются.</p></details>
           <details class="reveal"><summary>Почему бот молчит?</summary><p>Проверьте <code>status.cmd</code> и лог <code>bot.log</code>. Убедитесь, что OpenCode запущен и путь к <code>service.json</code> указан верно. Для второго сервиса используйте <code>/service</code>.</p></details>
           <details class="reveal"><summary>Можно добавить файлы и голосовые?</summary><p>Это следующий слой. Сейчас панель работает с текстом; файлы, voice и permission-запросы OpenCode пока не пробрасываются.</p></details>
         </div>

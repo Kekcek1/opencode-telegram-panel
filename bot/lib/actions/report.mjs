@@ -2,28 +2,44 @@ import { statfsSync } from "node:fs";
 import { confirmDelete, helpView, reportView, serviceView, statusView } from "../ui.mjs";
 import { repoInfo } from "../git.mjs";
 import { clip, esc } from "../format.mjs";
+import { friendlyError } from "../opencode.mjs";
 import { client, chatOf, currentSession, sendView } from "./shared.mjs";
 import { openSessions, showMain } from "./sessions.mjs";
 
 export async function openReport(ctx, chatId, editId) {
-  const oc = await client(ctx, chatId);
-  if (!oc) return;
   const chat = chatOf(ctx, chatId);
   if (!chat.activeSession) {
     await ctx.tg.send(chatId, "Сначала выбери сессию.");
     return openSessions(ctx, chatId, 0, editId);
   }
+  return openReportFor(ctx, chatId, chat.activeSession, editId);
+}
+
+export async function openReportFor(ctx, chatId, sessionId, editId) {
+  const oc = await client(ctx, chatId);
+  if (!oc || !sessionId) return;
   try {
-    const session = await oc.session(chat.activeSession);
+    const session = await oc.session(sessionId);
     const cwd = session.location?.directory || ctx.config.defaultDirectory;
     const [messages, info] = await Promise.all([
-      oc.messages(chat.activeSession, 50, "desc"),
+      oc.messages(sessionId, 50, "desc"),
       repoInfo(ctx.config, cwd),
     ]);
     await sendView(ctx, chatId, reportView({ session, messages, gitInfo: info, cwd }), editId);
   } catch (error) {
     await ctx.tg.send(chatId, `❌ ${esc(friendlyError(error))}`);
   }
+}
+
+export async function openSessionById(ctx, chatId, sessionId, editId) {
+  const oc = await client(ctx, chatId);
+  if (!oc || !sessionId) return;
+  const chat = chatOf(ctx, chatId);
+  chat.activeSession = sessionId;
+  chat.gitCwd = null;
+  chat.menu = null;
+  ctx.store.save();
+  await showMain(ctx, chatId, editId);
 }
 
 export async function openStatus(ctx, chatId, editId) {
