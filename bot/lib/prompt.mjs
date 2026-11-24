@@ -51,6 +51,8 @@ export async function runPrompt(ctx, chatId, text, options = {}) {
   const started = Date.now();
   let progressId = null;
   let finished = false;
+  ctx.activePrompts ??= new Set();
+  ctx.activePrompts.add(sessionId);
   chat.running = true;
   ctx.store.save();
 
@@ -150,6 +152,7 @@ export async function runPrompt(ctx, chatId, text, options = {}) {
     if (progressId) await ctx.tg.edit(chatId, progressId, `❌ <b>Ошибка</b>\n${esc(clip(message, 1800))}`).catch(() => {});
     else await ctx.tg.send(chatId, `❌ ${esc(clip(message, 1800))}`);
   } finally {
+    ctx.activePrompts?.delete(sessionId);
     chat.running = false;
     ctx.store.save();
   }

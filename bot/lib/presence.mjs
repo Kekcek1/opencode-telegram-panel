@@ -46,7 +46,7 @@ export class Presence {
           monitor[session.id] = { running, updated: session.time?.updated ?? 0, outcome: session.outcome ?? null };
           continue;
         }
-        if (!initial && previous.running && !running) {
+        if (!initial && previous.running && !running && !this.ctx.activePrompts?.has(session.id)) {
           const reportedAt = this.ctx.lastPromptReports?.[session.id] ?? 0;
           if (Date.now() - reportedAt > 60000) await this.notify(oc, session, chatId);
         }
@@ -88,6 +88,7 @@ export class Presence {
         return;
       } catch {
         live.messageId = null;
+        live.pinned = false;
       }
     }
     live.messageId = await this.ctx.tg.send(chatId, view.text, view.keyboard);
