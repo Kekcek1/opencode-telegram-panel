@@ -1,0 +1,818 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OpenCode Panel — пульт OpenCode в Telegram</title>
+  <meta name="description" content="Telegram-панель для OpenCode: общие сессии с ПК, модели, агенты, задачи с телефона, Git, отчёты и /btw.">
+  <meta property="og:title" content="OpenCode Panel — пульт OpenCode в Telegram">
+  <meta property="og:description" content="Сессии общие с ПК. Модели, агенты, Git и задачи с телефона — в одном Telegram-боте.">
+  <meta property="og:type" content="website">
+  <style>
+    :root {
+      --bg: #070b12;
+      --bg-2: #0a101b;
+      --surface: #0e1624;
+      --surface-2: #121d2f;
+      --line: #203049;
+      --line-soft: rgba(125, 211, 252, 0.14);
+      --text: #e9eff9;
+      --muted: #93a4bd;
+      --muted-2: #6f819c;
+      --mint: #6ee7b7;
+      --mint-2: #34d399;
+      --sky: #7dd3fc;
+      --amber: #fbbf24;
+      --danger: #fb7185;
+      --radius: 18px;
+      --shadow: 0 30px 90px rgba(0, 0, 0, 0.42);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--text);
+      background:
+        radial-gradient(900px 600px at 12% -10%, rgba(110, 231, 183, 0.10), transparent 60%),
+        radial-gradient(900px 600px at 88% 4%, rgba(125, 211, 252, 0.10), transparent 62%),
+        var(--bg);
+      font: 16px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+      overflow-x: hidden;
+    }
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(125, 211, 252, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(125, 211, 252, 0.035) 1px, transparent 1px);
+      background-size: 56px 56px;
+      mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 30%, transparent 75%);
+      z-index: -1;
+    }
+    a { color: var(--sky); text-decoration: none; }
+    a:hover { color: #bae6fd; }
+    img, svg { display: block; max-width: 100%; }
+    button { font: inherit; }
+    code, pre { font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace; }
+    ::selection { background: rgba(110, 231, 183, 0.28); color: #fff; }
+
+    .skip {
+      position: absolute;
+      left: -9999px;
+      top: 12px;
+      z-index: 100;
+      padding: 10px 14px;
+      border-radius: 10px;
+      background: var(--mint);
+      color: #04110c;
+      font-weight: 700;
+    }
+    .skip:focus { left: 12px; }
+    :focus-visible { outline: 2px solid var(--mint); outline-offset: 3px; }
+
+    .wrap { width: min(1120px, calc(100% - 40px)); margin-inline: auto; }
+
+    /* Header */
+    .top {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      border-bottom: 1px solid transparent;
+      background: rgba(7, 11, 18, 0.55);
+      backdrop-filter: blur(14px);
+      transition: border-color .25s ease, background .25s ease;
+    }
+    .top.scrolled { border-color: var(--line); background: rgba(7, 11, 18, 0.86); }
+    .top-inner { display: flex; align-items: center; gap: 22px; min-height: 66px; }
+    .brand { display: inline-flex; align-items: center; gap: 10px; color: var(--text); font-weight: 750; letter-spacing: -0.02em; }
+    .brand:hover { color: var(--text); }
+    .brand-mark {
+      width: 32px;
+      height: 32px;
+      border-radius: 10px;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(145deg, rgba(110,231,183,.22), rgba(125,211,252,.16));
+      border: 1px solid rgba(110,231,183,.32);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.12);
+      color: var(--mint);
+    }
+    .brand-mark svg { width: 17px; height: 17px; }
+    .brand span b { color: var(--mint); font-weight: 750; }
+    .nav { margin-left: auto; display: flex; align-items: center; gap: 4px; }
+    .nav a {
+      color: var(--muted);
+      padding: 8px 12px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      transition: color .2s ease, background .2s ease;
+    }
+    .nav a:hover { color: var(--text); background: rgba(255,255,255,.04); }
+    .nav a.nav-cta {
+      margin-left: 8px;
+      color: #04110c;
+      background: var(--mint);
+      border: 1px solid var(--mint);
+    }
+    .nav a.nav-cta:hover { background: #8ff3cd; color: #04110c; }
+    .burger {
+      display: none;
+      margin-left: auto;
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+      padding: 11px;
+    }
+    .burger span { display: block; height: 2px; background: currentColor; border-radius: 2px; transition: transform .22s ease, opacity .22s ease; }
+    .burger span + span { margin-top: 6px; }
+    .nav-open .burger span:nth-child(1) { transform: translateY(8px) rotate(45deg); }
+    .nav-open .burger span:nth-child(2) { opacity: 0; }
+    .nav-open .burger span:nth-child(3) { transform: translateY(-8px) rotate(-45deg); }
+
+    /* Shared */
+    .kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--mint);
+      font-size: 12px;
+      font-weight: 750;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+    }
+    .kicker::before { content: ""; width: 18px; height: 1px; background: currentColor; opacity: .7; }
+    h1, h2, h3 { margin: 0; letter-spacing: -0.035em; line-height: 1.04; }
+    h1 { font-size: clamp(44px, 7.4vw, 78px); font-weight: 800; }
+    h2 { font-size: clamp(30px, 4.5vw, 48px); font-weight: 780; }
+    h3 { font-size: 20px; font-weight: 720; letter-spacing: -0.02em; }
+    .lede { color: var(--muted); font-size: clamp(16px, 2vw, 19px); max-width: 58ch; }
+    .section { padding: clamp(72px, 10vw, 118px) 0; }
+    .section-head { display: grid; gap: 16px; max-width: 760px; margin-bottom: 42px; }
+    .section-head p { margin: 0; color: var(--muted); font-size: 17px; max-width: 62ch; }
+    .accent { color: var(--mint); }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      min-height: 48px;
+      padding: 0 20px;
+      border-radius: 12px;
+      border: 1px solid transparent;
+      font-weight: 720;
+      font-size: 15px;
+      transition: transform .18s ease, background .18s ease, border-color .18s ease;
+      cursor: pointer;
+    }
+    .btn:hover { transform: translateY(-1px); }
+    .btn-primary { background: var(--mint); color: #04110c; box-shadow: 0 12px 28px rgba(110,231,183,.18); }
+    .btn-primary:hover { background: #8ff3cd; color: #04110c; }
+    .btn-ghost { border-color: var(--line); background: rgba(255,255,255,.025); color: var(--text); }
+    .btn-ghost:hover { border-color: rgba(125,211,252,.36); background: rgba(125,211,252,.06); color: var(--text); }
+    .btn svg { width: 17px; height: 17px; }
+
+    /* Hero */
+    .hero { position: relative; padding: clamp(62px, 9vw, 104px) 0 clamp(54px, 8vw, 92px); }
+    .hero-grid { display: grid; grid-template-columns: minmax(0, 1.08fr) minmax(320px, .92fr); gap: clamp(36px, 6vw, 76px); align-items: center; }
+    .hero-copy { display: grid; gap: 22px; justify-items: start; }
+    .hero h1 .grad {
+      display: inline-block;
+      background: linear-gradient(100deg, var(--mint) 0%, var(--sky) 88%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 4px; }
+    .hero-points { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 4px 0 0; padding: 0; list-style: none; color: var(--muted); font-size: 14px; }
+    .hero-points li { display: inline-flex; align-items: center; gap: 8px; }
+    .hero-points li::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--mint); box-shadow: 0 0 12px rgba(110,231,183,.7); }
+    .hero-glow {
+      position: absolute;
+      inset: 8% 0 auto auto;
+      width: 420px;
+      height: 420px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(110,231,183,.13), transparent 68%);
+      filter: blur(14px);
+      pointer-events: none;
+    }
+
+    /* Phone mockup */
+    .phone-wrap { position: relative; display: grid; place-items: center; min-height: 560px; }
+    .phone {
+      position: relative;
+      width: min(330px, 100%);
+      border-radius: 42px;
+      padding: 10px;
+      background: linear-gradient(160deg, #1b283d, #0a111c 58%, #172238);
+      border: 1px solid rgba(125,211,252,.22);
+      box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.10);
+      transform: rotate(-2deg);
+    }
+    .phone::after {
+      content: "";
+      position: absolute;
+      inset: -16px;
+      border-radius: 56px;
+      background: radial-gradient(circle at 70% 25%, rgba(110,231,183,.12), transparent 58%);
+      z-index: -1;
+    }
+    .phone-frame { position: relative; border-radius: 33px; overflow: hidden; background: #0a111b; border: 1px solid rgba(255,255,255,.06); }
+    .phone-notch { position: absolute; top: 9px; left: 50%; transform: translateX(-50%); width: 92px; height: 21px; border-radius: 0 0 14px 14px; background: #050910; z-index: 3; }
+    .screen { min-height: 540px; display: flex; flex-direction: column; background: linear-gradient(180deg, #0c1421, #0a111b); }
+    .screen-top { display: flex; align-items: center; gap: 8px; padding: 23px 16px 12px; font-size: 12px; color: var(--muted); border-bottom: 1px solid rgba(255,255,255,.05); }
+    .screen-top .online { width: 7px; height: 7px; border-radius: 50%; background: var(--mint); box-shadow: 0 0 10px rgba(110,231,183,.8); }
+    .screen-top b { color: var(--text); font-size: 12.5px; }
+    .screen-top .more { margin-left: auto; letter-spacing: 2px; color: var(--muted-2); }
+    .chat { display: flex; flex-direction: column; gap: 10px; padding: 14px 12px; flex: 1; }
+    .msg { max-width: 92%; padding: 11px 12px; border-radius: 14px; font-size: 11.5px; line-height: 1.5; color: #dce8f7; }
+    .msg.bot { background: #121d2d; border: 1px solid rgba(125,211,252,.10); border-bottom-left-radius: 5px; }
+    .msg.user { align-self: flex-end; background: linear-gradient(145deg, #1f5c4a, #164638); border: 1px solid rgba(110,231,183,.22); border-bottom-right-radius: 5px; color: #eafff8; }
+    .msg .label { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; color: var(--mint); font-weight: 750; font-size: 11px; }
+    .msg .muted { color: var(--muted); }
+    .msg .money { color: var(--amber); }
+    .keyboard { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 9px; }
+    .keyboard span { display: block; padding: 6px 7px; border-radius: 7px; background: #0b1422; border: 1px solid rgba(125,211,252,.14); color: #b9d7ea; font-size: 10px; text-align: center; }
+    .keyboard span.hot { color: var(--mint); border-color: rgba(110,231,183,.28); }
+    .composer { display: flex; align-items: center; gap: 8px; margin: 0 10px 12px; padding: 9px 11px; border-radius: 12px; border: 1px solid rgba(125,211,252,.13); background: #0b1421; color: var(--muted-2); font-size: 11px; }
+    .composer .send { margin-left: auto; width: 24px; height: 24px; border-radius: 8px; display: grid; place-items: center; background: var(--mint); color: #04110c; font-size: 12px; }
+    .float-card {
+      position: absolute;
+      right: -4px;
+      bottom: 58px;
+      padding: 10px 13px;
+      border-radius: 12px;
+      background: rgba(14, 22, 36, 0.92);
+      border: 1px solid rgba(110,231,183,.24);
+      box-shadow: 0 18px 40px rgba(0,0,0,.4);
+      font-size: 11px;
+      color: var(--muted);
+      backdrop-filter: blur(10px);
+    }
+    .float-card b { color: var(--mint); font-weight: 720; }
+
+    /* Stats */
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; margin-top: 20px; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: var(--line); }
+    .stat { background: var(--surface); padding: 22px 20px; display: grid; gap: 3px; }
+    .stat strong { font-size: 24px; letter-spacing: -0.04em; color: var(--text); }
+    .stat span { color: var(--muted); font-size: 13px; }
+
+    /* Features */
+    .features-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 14px; }
+    .card {
+      position: relative;
+      grid-column: span 4;
+      padding: 24px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: linear-gradient(160deg, rgba(18, 29, 47, 0.82), rgba(10, 16, 27, 0.8));
+      overflow: hidden;
+      transition: border-color .22s ease, transform .22s ease;
+    }
+    .card:hover { border-color: rgba(125,211,252,.32); transform: translateY(-2px); }
+    .card.wide { grid-column: span 6; }
+    .card.third { grid-column: span 4; }
+    .card::after {
+      content: "";
+      position: absolute;
+      width: 180px;
+      height: 180px;
+      right: -80px;
+      top: -80px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(110,231,183,.10), transparent 68%);
+      pointer-events: none;
+    }
+    .icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      margin-bottom: 16px;
+      background: rgba(110,231,183,.08);
+      border: 1px solid rgba(110,231,183,.20);
+      color: var(--mint);
+    }
+    .icon svg { width: 20px; height: 20px; }
+    .card h3 { margin-bottom: 8px; }
+    .card p { margin: 0; color: var(--muted); font-size: 14.5px; }
+    .card .chip { display: inline-flex; margin-top: 14px; padding: 5px 9px; border-radius: 7px; background: #0a1421; border: 1px solid var(--line); color: var(--sky); font: 11px ui-monospace, Consolas, monospace; }
+
+    /* How */
+    .how { border-block: 1px solid var(--line); background: linear-gradient(180deg, rgba(18,29,47,.42), rgba(7,11,18,.2)); }
+    .flow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 34px; }
+    .node { position: relative; padding: 22px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface); }
+    .node .num { color: var(--mint); font: 700 12px ui-monospace, Consolas, monospace; letter-spacing: .1em; }
+    .node h3 { margin-top: 8px; font-size: 17px; }
+    .node p { margin: 6px 0 0; color: var(--muted); font-size: 13px; }
+    .flow .node:not(:last-child)::after {
+      content: "→";
+      position: absolute;
+      right: -15px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--mint);
+      font-size: 18px;
+      opacity: .7;
+    }
+
+    /* Install */
+    .install-grid { display: grid; grid-template-columns: minmax(0, .92fr) minmax(0, 1.08fr); gap: 30px; align-items: start; }
+    .steps { display: grid; gap: 14px; counter-reset: step; }
+    .step { display: grid; grid-template-columns: 34px 1fr; gap: 14px; padding: 16px 18px; border-radius: 14px; border: 1px solid var(--line); background: rgba(14,22,36,.6); }
+    .step::before { counter-increment: step; content: counter(step); width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; background: rgba(110,231,183,.10); border: 1px solid rgba(110,231,183,.22); color: var(--mint); font: 700 13px ui-monospace, Consolas, monospace; }
+    .step h3 { font-size: 16px; margin-bottom: 4px; }
+    .step p { margin: 0; color: var(--muted); font-size: 14px; }
+    .terminal { border: 1px solid var(--line); border-radius: var(--radius); background: #080e17; overflow: hidden; box-shadow: var(--shadow); }
+    .term-top { display: flex; align-items: center; gap: 7px; padding: 12px 14px; border-bottom: 1px solid var(--line); background: #0b1320; }
+    .term-top i { width: 9px; height: 9px; border-radius: 50%; background: var(--danger); opacity: .8; }
+    .term-top i:nth-child(2) { background: var(--amber); }
+    .term-top i:nth-child(3) { background: var(--mint); }
+    .term-top span { margin-left: 5px; color: var(--muted-2); font: 11px ui-monospace, Consolas, monospace; }
+    .code { position: relative; margin: 0; padding: 18px; overflow-x: auto; color: #cfe3f7; font-size: 12.5px; line-height: 1.75; }
+    .code + .code { border-top: 1px solid rgba(255,255,255,.05); }
+    .code .c { color: #5c7694; }
+    .code .g { color: var(--mint); }
+    .code .y { color: var(--amber); }
+    .copy { position: absolute; right: 10px; top: 10px; padding: 5px 8px; border-radius: 7px; border: 1px solid var(--line); background: var(--surface-2); color: var(--muted); font-size: 11px; cursor: pointer; }
+    .copy:hover { color: var(--text); border-color: rgba(125,211,252,.35); }
+    .note { margin-top: 14px; padding: 13px 15px; border-radius: 12px; border: 1px solid rgba(251,191,36,.22); background: rgba(251,191,36,.05); color: #e9d8a6; font-size: 13px; }
+
+    /* Commands */
+    .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+    table { width: 100%; border-collapse: collapse; min-width: 620px; }
+    th, td { text-align: left; padding: 13px 16px; border-bottom: 1px solid rgba(255,255,255,.055); font-size: 14px; }
+    th { color: var(--muted-2); font-size: 11px; text-transform: uppercase; letter-spacing: .12em; background: #0b1320; }
+    td:first-child { white-space: nowrap; }
+    td code { color: var(--mint); background: #0a1421; border: 1px solid var(--line); padding: 3px 6px; border-radius: 6px; font-size: 12px; }
+    tr:last-child td { border-bottom: 0; }
+
+    /* Security */
+    .security-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    .security-card { padding: 22px; border-radius: 14px; border: 1px solid var(--line); background: rgba(14,22,36,.62); }
+    .security-card .icon { margin-bottom: 12px; }
+    .security-card h3 { font-size: 16px; margin-bottom: 6px; }
+    .security-card p { margin: 0; color: var(--muted); font-size: 13.5px; }
+
+    /* FAQ */
+    .faq { display: grid; gap: 10px; max-width: 900px; }
+    details { border: 1px solid var(--line); border-radius: 13px; background: var(--surface); }
+    summary { cursor: pointer; padding: 17px 18px; font-weight: 650; list-style: none; display: flex; justify-content: space-between; gap: 16px; }
+    summary::-webkit-details-marker { display: none; }
+    summary::after { content: "+"; color: var(--mint); font-weight: 400; font-size: 20px; line-height: 1; }
+    details[open] summary::after { content: "−"; }
+    details p { margin: 0; padding: 0 18px 18px; color: var(--muted); font-size: 14px; }
+
+    /* Footer */
+    .footer { border-top: 1px solid var(--line); padding: 46px 0 34px; }
+    .footer-inner { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; justify-content: space-between; }
+    .footer p { margin: 8px 0 0; color: var(--muted); font-size: 13px; max-width: 46ch; }
+    .footer-links { display: flex; flex-wrap: wrap; gap: 18px; color: var(--muted); font-size: 13px; }
+    .footer-links a { color: var(--muted); }
+    .footer-links a:hover { color: var(--text); }
+    .footer-bottom { margin-top: 30px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,.05); color: var(--muted-2); font-size: 12px; display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; }
+
+    /* Reveal */
+    .reveal { opacity: 0; transform: translateY(16px); transition: opacity .55s ease, transform .55s ease; }
+    .reveal.on { opacity: 1; transform: none; }
+
+    @media (max-width: 980px) {
+      .hero-grid { grid-template-columns: 1fr; }
+      .phone-wrap { min-height: auto; }
+      .phone { width: 300px; transform: rotate(-1deg); }
+      .card, .card.wide, .card.third { grid-column: span 6; }
+      .flow { grid-template-columns: 1fr 1fr; }
+      .flow .node::after { display: none; }
+      .install-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 900px) {
+      .nav {
+        position: fixed;
+        inset: 66px 12px auto;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 4px;
+        padding: 12px;
+        border-radius: 16px;
+        border: 1px solid var(--line);
+        background: rgba(10, 16, 27, .98);
+        box-shadow: var(--shadow);
+        transform: translateY(-12px);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity .2s ease, transform .2s ease;
+      }
+      .nav-open .nav { opacity: 1; transform: none; pointer-events: auto; }
+      .nav a { padding: 12px; }
+      .nav a.nav-cta { margin-left: 0; text-align: center; }
+      .burger { display: block; }
+      .stats { grid-template-columns: 1fr 1fr; }
+      .security-grid { grid-template-columns: 1fr; }
+      .card, .card.wide, .card.third { grid-column: span 12; }
+      .flow { grid-template-columns: 1fr; }
+      .float-card { right: 8px; bottom: 38px; }
+    }
+    @media (max-width: 480px) {
+      .wrap { width: min(100% - 28px, 1120px); }
+      .hero { padding-top: 48px; }
+      .hero-actions .btn { width: 100%; }
+      .phone { width: 100%; max-width: 310px; }
+      .float-card { display: none; }
+      .stats { grid-template-columns: 1fr; }
+      .section { padding: 64px 0; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+      .reveal { opacity: 1; transform: none; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#main">Перейти к содержимому</a>
+
+  <header class="top" id="top">
+    <div class="wrap top-inner">
+      <a class="brand" href="#top" aria-label="OpenCode Panel — на главную">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m7 10 2.5 2L7 14"/><path d="M12 14h5"/></svg>
+        </span>
+        <span>OpenCode <b>Panel</b></span>
+      </a>
+      <nav class="nav" id="nav" aria-label="Основная навигация">
+        <a href="#features">Возможности</a>
+        <a href="#how">Как работает</a>
+        <a href="#install">Установка</a>
+        <a href="#commands">Команды</a>
+        <a href="#security">Безопасность</a>
+        <a class="nav-cta" href="https://github.com/Kekcek1/opencode-telegram-panel" target="_blank" rel="noreferrer">GitHub</a>
+      </nav>
+      <button class="burger" id="burger" type="button" aria-label="Открыть меню" aria-controls="nav" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero" id="hero">
+      <div class="hero-glow" aria-hidden="true"></div>
+      <div class="wrap hero-grid">
+        <div class="hero-copy">
+          <div class="kicker">Telegram × OpenCode</div>
+          <h1>Пульт <span class="grad">OpenCode</span><br>в Telegram</h1>
+          <p class="lede">Создавай сессии, меняй модели и агентов, ставь задачи с телефона, управляй Git и смотри отчёты — на том же OpenCode, что открыт на ПК.</p>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="#install">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+              Как установить
+            </a>
+            <a class="btn btn-ghost" href="https://github.com/Kekcek1/opencode-telegram-panel" target="_blank" rel="noreferrer">
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.3.8-.6v-2.1c-3.2.7-3.9-1.5-3.9-1.5-.5-1.3-1.3-1.7-1.3-1.7-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.7 2.7 1.2 3.4.9.1-.7.4-1.2.7-1.5-2.6-.3-5.3-1.3-5.3-5.8 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.2 1.2a11 11 0 0 1 5.8 0c2.2-1.5 3.2-1.2 3.2-1.2.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.5-2.7 5.5-5.3 5.8.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6 4.6-1.5 7.9-5.8 7.9-10.9C23.5 5.7 18.3.5 12 .5Z"/></svg>
+              Открыть GitHub
+            </a>
+          </div>
+          <ul class="hero-points">
+            <li>Сессии общие с ПК</li>
+            <li>Git без окон входа</li>
+            <li>/btw и отчёты</li>
+          </ul>
+        </div>
+
+        <div class="phone-wrap">
+          <div class="phone" aria-hidden="true">
+            <div class="phone-frame">
+              <div class="phone-notch"></div>
+              <div class="screen">
+                <div class="screen-top">
+                  <span class="online"></span>
+                  <b>@Live_agent_bot</b>
+                  <span class="more">⋯</span>
+                </div>
+                <div class="chat">
+                  <div class="msg bot">
+                    <div class="label">🧠 OpenCode Panel</div>
+                    Сессия: <b>Astra_Game</b><br>
+                    Модель: <span class="muted">commandcode/…/flash</span><br>
+                    Агент: <b>build</b> · <span class="money">$0.84</span>
+                    <div class="keyboard">
+                      <span>📋 Сессии</span><span class="hot">➕ Новая</span>
+                      <span>🧠 Модель</span><span>🌿 Git</span>
+                      <span>📊 Отчёт</span><span>✍️ Задача</span>
+                    </div>
+                  </div>
+                  <div class="msg user">/task Собери прототип меню и проверь на 390 px</div>
+                  <div class="msg bot">
+                    <div class="label">✅ Готово · 12 с</div>
+                    Прототип собран, 0 ошибок консоли.<br>
+                    <span class="muted">2 файла · 61 fps · MCP online</span>
+                  </div>
+                </div>
+                <div class="composer">Написать задачу… <span class="send">➤</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="float-card"><b>🌿 main</b> · clean · ahead 0</div>
+        </div>
+      </div>
+
+      <div class="wrap">
+        <div class="stats reveal">
+          <div class="stat"><strong>PC ↔ TG</strong><span>одни и те же сессии</span></div>
+          <div class="stat"><strong>114</strong><span>моделей в меню</span></div>
+          <div class="stat"><strong>0 окон</strong><span>бот работает в фоне</span></div>
+          <div class="stat"><strong>/btw</strong><span>вклинивание в работу</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="features">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <div class="kicker">Возможности</div>
+          <h2>Всё управление — в одном чате</h2>
+          <p>Не ещё один клиент OpenCode, а пульт к уже запущенному сервису. Никакой синхронизации баз и дублирования истории.</p>
+        </div>
+        <div class="features-grid">
+          <article class="card wide reveal">
+            <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8"/><path d="M12 16v4"/><path d="m7 8 2 2-2 2"/><path d="M12 12h4"/></svg></div>
+            <h3>Сессии без границ</h3>
+            <p>Создал в Telegram — появилось в TUI на ПК. Создал на ПК — видно в <code>/sessions</code>. Кнопка «Взять с ПК» подхватывает активную сессию.</p>
+            <span class="chip">GET /api/session</span>
+          </article>
+          <article class="card wide reveal">
+            <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v4"/><path d="M12 17v4"/><path d="M3 12h4"/><path d="M17 12h4"/><circle cx="12" cy="12" r="4"/></svg></div>
+            <h3>Модели и уровни мышления</h3>
+            <p>Провайдер → модель → <code>minimal / low / medium / high / max</code>. Быстрый поиск: <code>/model deepseek</code>. То же для агента и плана.</p>
+            <span class="chip">POST /api/session/:id/model</span>
+          </article>
+          <article class="card third reveal">
+            <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m4 4 16 16"/><path d="M4 20 20 4"/><circle cx="12" cy="12" r="9"/></svg></div>
+            <h3>Задачи с телефона</h3>
+            <p>Обычный текст уходит в выбранную сессию. <code>/task</code> создаёт быструю сессию, если ничего не выбрано.</p>
+          </article>
+          <article class="card third reveal">
+            <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="6" r="2.5"/><path d="M6 8.5v7"/><path d="M8.5 6h7"/><path d="M18 8.5c0 4-4 4.5-7 5.5"/></svg></div>
+            <h3>Git рядом</h3>
+            <p>Статус, коммит, push, pull, история и ветки. Секреты и <code>.env</code> блокируются до коммита.</p>
+          </article>
+          <article class="card third reveal">
+            <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5"/><path d="M4 19h16"/><path d="m7 15 4-5 3 3 5-7"/></svg></div>
+            <h3>Отчёты</h3>
+            <p>Токены, стоимость, модель, агент, последний ответ и Git-статус. Без похода в TUI.</p>
+          </article>
+          <article class="card wide reveal">
+            <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 7V4h6v3"/><rect x="4" y="7" width="16" height="13" rx="2"/><path d="M8 12h8"/><path d="M8 16h5"/></svg></div>
+            <h3>Коннекты и MCP</h3>
+            <p>Провайдеры, активные ключи CommandCode/A6API/AMD, MCP connect/disconnect. Переключил ключ — панель лимитов сразу показывает другой.</p>
+            <span class="chip">/connections</span>
+          </article>
+          <article class="card wide reveal">
+            <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 5 6v5c0 5 3 8 7 10 4-2 7-5 7-10V6l-7-3Z"/><path d="m9 12 2 2 4-4"/></svg></div>
+            <h3>Белый список и никакого shell</h3>
+            <p>Только numeric ID владельца. Бот не выполняет произвольные команды: HTTP API OpenCode и фиксированные Git-операции.</p>
+            <span class="chip">fail closed</span>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section how" id="how">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <div class="kicker">Как работает</div>
+          <h2>Один сервис — два экрана</h2>
+          <p>Бот не хранит свою историю. Он подключается к тому же OpenCode, что и TUI, и работает через его HTTP API.</p>
+        </div>
+        <div class="flow">
+          <div class="node reveal"><div class="num">01</div><h3>Telegram</h3><p>Кнопки, команды и обычный текст с телефона.</p></div>
+          <div class="node reveal"><div class="num">02</div><h3>Node-бот</h3><p>Long polling, белый список, меню и промты.</p></div>
+          <div class="node reveal"><div class="num">03</div><h3>OpenCode API</h3><p><code>/api/session</code>, <code>/api/model</code>, <code>/api/mcp</code>.</p></div>
+          <div class="node reveal"><div class="num">04</div><h3>ПК</h3><p>TUI, база сессий, Git и модели — всё общее.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="install">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <div class="kicker">Установка</div>
+          <h2>Пять минут до первой задачи</h2>
+          <p>Нужен Node.js 20+ и запущенный OpenCode. Бот ставится рядом, без облака и внешней базы.</p>
+        </div>
+        <div class="install-grid">
+          <div class="steps">
+            <div class="step reveal"><div><h3>Склонируй репозиторий</h3><p>Публичный код без секретов и истории.</p></div></div>
+            <div class="step reveal"><div><h3>Создай конфиг</h3><p>Скопируй <code>config.example.json</code> → <code>config.json</code> и укажи пути к <code>service.json</code>, папку и Git.</p></div></div>
+            <div class="step reveal"><div><h3>Добавь токен</h3><p>Создай <code>secrets/bot.env</code> с токеном BotFather и своим username или numeric ID.</p></div></div>
+            <div class="step reveal"><div><h3>Запусти в фоне</h3><p><code>start-silent.vbs</code> — без окна. В Telegram отправь <code>/start</code>.</p></div></div>
+          </div>
+
+          <div class="terminal reveal">
+            <div class="term-top"><i></i><i></i><i></i><span>PowerShell / bash</span></div>
+            <pre class="code"><button class="copy" type="button" data-copy="#clone">Копировать</button><span id="clone"><span class="c"># 1. Код</span>
+git clone https://github.com/Kekcek1/opencode-telegram-panel.git
+cd opencode-telegram-panel/bot
+
+<span class="c"># 2. Конфиг</span>
+copy config.example.json config.json
+
+<span class="c"># 3. Секреты</span>
+mkdir secrets
+notepad secrets\bot.env</span></pre>
+            <pre class="code"><button class="copy" type="button" data-copy="#env">Копировать</button><span id="env"><span class="c"># secrets/bot.env</span>
+TELEGRAM_BOT_TOKEN=<span class="y">токен_от_BotFather</span>
+TELEGRAM_ALLOWED_USERNAME=<span class="y">your_username</span>
+<span class="c"># TELEGRAM_ALLOWED_ID=123456789</span></span></pre>
+            <pre class="code"><button class="copy" type="button" data-copy="#run">Копировать</button><span id="run"><span class="c"># 4. Запуск без окна</span>
+start-silent.vbs
+
+<span class="c"># остановка / статус</span>
+stop.cmd
+status.cmd</span></pre>
+          </div>
+        </div>
+        <div class="note reveal">Если OpenCode запущен в переносимой папке, укажи путь к её <code>state/opencode/service.json</code>. Если сервисов несколько — переключение в боте командой <code>/service</code>.</div>
+      </div>
+    </section>
+
+    <section class="section" id="commands">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <div class="kicker">Команды</div>
+          <h2>Коротко и с телефона</h2>
+          <p>Обычный текст — это промт в выбранную сессию. Всё остальное — команды и кнопки.</p>
+        </div>
+        <div class="table-wrap reveal">
+          <table>
+            <thead><tr><th>Команда</th><th>Что делает</th></tr></thead>
+            <tbody>
+              <tr><td><code>/start</code></td><td>Главное меню: сессия, модель, агент, Git, отчёт.</td></tr>
+              <tr><td><code>/sessions</code></td><td>Список сессий, выбор активной, «взять с ПК».</td></tr>
+              <tr><td><code>/new</code></td><td>Новая сессия: папка → провайдер → модель → агент.</td></tr>
+              <tr><td><code>/model</code></td><td>Сменить модель; <code>/model deepseek</code> — поиск.</td></tr>
+              <tr><td><code>/agent</code>, <code>/plan</code></td><td>Сменить агента или план.</td></tr>
+              <tr><td><code>/task текст</code></td><td>Быстрая задача с телефона; создаст сессию при необходимости.</td></tr>
+              <tr><td><code>/btw текст</code></td><td>Вклиниться в текущую работу через <code>delivery: steer</code>.</td></tr>
+              <tr><td><code>/report</code></td><td>Токены, стоимость, модель, последний ответ, Git.</td></tr>
+              <tr><td><code>/git</code></td><td>Статус, коммит, push, pull, история, ветки, выбор репо.</td></tr>
+              <tr><td><code>/connections</code></td><td>Провайдеры, активные ключи, MCP.</td></tr>
+              <tr><td><code>/service</code></td><td>Выбрать запущенный сервис OpenCode.</td></tr>
+              <tr><td><code>/status</code></td><td>Сервис, сессии, расход, свободное место.</td></tr>
+              <tr><td><code>/stop</code></td><td>Прервать генерацию.</td></tr>
+              <tr><td><code>/rename</code>, <code>/delete</code></td><td>Переименовать или удалить сессию.</td></tr>
+              <tr><td><code>/id</code></td><td>Показать Telegram ID для белого списка.</td></tr>
+              <tr><td><code>/help</code></td><td>Краткая шпаргалка.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="security">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <div class="kicker">Безопасность</div>
+          <h2>Только ты и твой ПК</h2>
+          <p>Бот не публикует сервис в интернет и не принимает команды от посторонних.</p>
+        </div>
+        <div class="security-grid">
+          <div class="security-card reveal">
+            <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg></div>
+            <h3>Numeric ID</h3>
+            <p>Проверка по ID, а не только по username. Посторонние игнорируются, попытки попадают в <code>access.log</code>.</p>
+          </div>
+          <div class="security-card reveal">
+            <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><path d="M5 8h14"/><path d="m7 16 5 5 5-5"/></svg></div>
+            <h3>Никакого shell</h3>
+            <p>Из Telegram нельзя выполнить произвольную команду. Только API OpenCode и фиксированные Git-операции.</p>
+          </div>
+          <div class="security-card reveal">
+            <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><path d="M12 14v2"/></svg></div>
+            <h3>Секреты не уедут</h3>
+            <p>Токен и конфиг в <code>.gitignore</code>. Коммит блокирует <code>.env</code>, <code>secrets</code>, <code>service.json</code> и ключи.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="faq">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <div class="kicker">FAQ</div>
+          <h2>Коротко о главном</h2>
+        </div>
+        <div class="faq">
+          <details class="reveal"><summary>Почему сессии видны и на ПК, и в Telegram?</summary><p>Бот не создаёт отдельную базу. Он подключается к тому же HTTP-сервису OpenCode, что и TUI, поэтому история, модели и активные сессии общие.</p></details>
+          <details class="reveal"><summary>Нужен хостинг или облако?</summary><p>Нет. Бот работает на том же ПК, где запущен OpenCode. Telegram используется только как интерфейс.</p></details>
+          <details class="reveal"><summary>Что если запущено несколько OpenCode?</summary><p>В главном меню виден URL активного сервиса. Команда <code>/service</code> показывает все доступные <code>service.json</code> и переключает бота.</p></details>
+          <details class="reveal"><summary>Бот может выполнить любую команду на ПК?</summary><p>Нет. Он умеет только вызывать API OpenCode и фиксированные Git-команды. Произвольный shell из Telegram запрещён.</p></details>
+          <details class="reveal"><summary>Почему бот молчит?</summary><p>Проверьте <code>status.cmd</code> и лог <code>bot.log</code>. Убедитесь, что OpenCode запущен и путь к <code>service.json</code> указан верно. Для второго сервиса используйте <code>/service</code>.</p></details>
+          <details class="reveal"><summary>Можно добавить файлы и голосовые?</summary><p>Это следующий слой. Сейчас панель работает с текстом; файлы, voice и permission-запросы OpenCode пока не пробрасываются.</p></details>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap">
+      <div class="footer-inner">
+        <div>
+          <a class="brand" href="#top">
+            <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m7 10 2.5 2L7 14"/><path d="M12 14h5"/></svg></span>
+            <span>OpenCode <b>Panel</b></span>
+          </a>
+          <p>Пульт управления OpenCode из Telegram. Локально, без облака и без дублирования истории.</p>
+        </div>
+        <div class="footer-links">
+          <a href="#features">Возможности</a>
+          <a href="#install">Установка</a>
+          <a href="#commands">Команды</a>
+          <a href="https://github.com/Kekcek1/opencode-telegram-panel" target="_blank" rel="noreferrer">GitHub</a>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>Не официальный проект OpenCode. Сделано для OpenCode 2.2.1.</span>
+        <span>Telegram · Node.js · GitHub Pages</span>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    (() => {
+      const body = document.body;
+      const burger = document.getElementById("burger");
+      const nav = document.getElementById("nav");
+      const top = document.getElementById("top");
+      const closeNav = () => {
+        body.classList.remove("nav-open");
+        burger?.setAttribute("aria-expanded", "false");
+      };
+      burger?.addEventListener("click", () => {
+        const open = body.classList.toggle("nav-open");
+        burger.setAttribute("aria-expanded", String(open));
+      });
+      nav?.querySelectorAll("a").forEach((link) => link.addEventListener("click", closeNav));
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") closeNav();
+      });
+      document.addEventListener("click", (event) => {
+        if (!body.classList.contains("nav-open")) return;
+        if (nav?.contains(event.target) || burger?.contains(event.target)) return;
+        closeNav();
+      });
+      const onScroll = () => top?.classList.toggle("scrolled", window.scrollY > 8);
+      onScroll();
+      window.addEventListener("scroll", onScroll, { passive: true });
+
+      document.querySelectorAll("[data-copy]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          const target = document.querySelector(button.dataset.copy);
+          if (!target) return;
+          const text = target.innerText;
+          try {
+            await navigator.clipboard.writeText(text);
+            button.textContent = "Скопировано";
+          } catch {
+            const area = document.createElement("textarea");
+            area.value = text;
+            area.style.position = "fixed";
+            area.style.opacity = "0";
+            document.body.appendChild(area);
+            area.select();
+            document.execCommand("copy");
+            area.remove();
+            button.textContent = "Скопировано";
+          }
+          setTimeout(() => { button.textContent = "Копировать"; }, 1500);
+        });
+      });
+
+      const items = document.querySelectorAll(".reveal");
+      if (!("IntersectionObserver" in window) || matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        items.forEach((item) => item.classList.add("on"));
+        return;
+      }
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("on");
+            observer.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.12 });
+      items.forEach((item) => observer.observe(item));
+    })();
+  </script>
+</body>
+</html>

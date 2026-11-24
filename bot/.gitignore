@@ -1,0 +1,8 @@
+secrets/
+config.json
+state.json
+bot.log
+access.log
+bot.pid
+tmp/
+__pycache__/

@@ -1,0 +1,9 @@
+bot/secrets/
+bot/config.json
+bot/state.json
+bot/bot.log
+bot/access.log
+bot/bot.pid
+bot/tmp/
+node_modules/
+.DS_Store

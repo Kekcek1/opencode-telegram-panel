@@ -1,0 +1,20 @@
+{
+  "botName": "OpenCode Panel",
+  "allowedUsername": "your_telegram_username",
+  "allowedId": null,
+  "defaultDirectory": "C:\\Users\\you",
+  "defaultModel": {
+    "providerID": "commandcode",
+    "id": "deepseek/deepseek-v4.1-flash",
+    "variant": "low"
+  },
+  "defaultAgent": "build",
+  "serviceStates": [
+    "C:\\Users\\you\\.local\\state\\opencode\\service.json",
+    "C:\\Users\\you\\AppData\\Local\\opencode\\state\\service.json"
+  ],
+  "gitExe": "git",
+  "repos": [],
+  "promptTimeoutMs": 900000,
+  "progressIntervalMs": 5000
+}
