@@ -1,4 +1,8 @@
+import { readFileSync, statSync } from "node:fs";
+import { basename } from "node:path";
 import { chunks, sleep } from "./format.mjs";
+
+const DOCUMENT_LIMIT = 50 * 1024 * 1024;
 
 export class Telegram {
   constructor(token) {
@@ -72,6 +76,37 @@ export class Telegram {
       }
       throw error;
     }
+  }
+
+  async delete(chatId, messageId) {
+    try {
+      await this.call("deleteMessage", { chat_id: chatId, message_id: messageId });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async sendDocument(chatId, path, caption) {
+    const size = statSync(path).size;
+    if (size > DOCUMENT_LIMIT) {
+      throw new Error(`файл больше 50 МБ (${(size / 1024 ** 2).toFixed(1)} МБ)`);
+    }
+    const form = new FormData();
+    form.append("chat_id", String(chatId));
+    form.append("document", new Blob([readFileSync(path)]), basename(path));
+    if (caption) {
+      form.append("caption", caption);
+      form.append("parse_mode", "HTML");
+    }
+    const response = await fetch(`${this.base}/sendDocument`, {
+      method: "POST",
+      body: form,
+      signal: AbortSignal.timeout(120000),
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(`sendDocument: ${body.description || response.status}`);
+    return body.result?.message_id;
   }
 
   async answerCallback(id, text) {

@@ -3,6 +3,7 @@
   "allowedUsername": "your_telegram_username",
   "allowedId": null,
   "defaultDirectory": "C:\\Users\\you",
+  "sessionRoot": "C:\\Users\\you\\sessions",
   "defaultModel": {
     "providerID": "commandcode",
     "id": "deepseek/deepseek-v4.1-flash",

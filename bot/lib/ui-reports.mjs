@@ -126,8 +126,8 @@ export function liveView({ activeSessions, sessions, now = Date.now() }) {
   return {
     text: lines.join("\n"),
     keyboard: kb([
-      [{ text: "🔄 Обновить", callback_data: "live" }, { text: "📋 Сессии", callback_data: "sessions" }],
-      [{ text: "➕ Новая", callback_data: "new" }],
+      [{ text: "🏠 Меню", callback_data: "nav" }, { text: "📋 Сессии", callback_data: "navs" }],
+      [{ text: "➕ Новая", callback_data: "navnew" }, { text: "🔄 Обновить", callback_data: "live" }],
     ]),
   };
 }

@@ -39,6 +39,8 @@ export class Store {
       mode: null,
       menu: null,
       wizard: null,
+      navMessageId: null,
+      reportMessageId: null,
     };
     return this.data.chats[key];
   }

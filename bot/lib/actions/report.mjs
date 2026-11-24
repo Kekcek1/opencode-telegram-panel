@@ -1,9 +1,10 @@
 import { statfsSync } from "node:fs";
 import { confirmDelete, helpView, reportView, serviceView, statusView } from "../ui.mjs";
 import { repoInfo } from "../git.mjs";
+import { removeSession } from "../groups.mjs";
 import { clip, esc } from "../format.mjs";
 import { friendlyError } from "../opencode.mjs";
-import { client, chatOf, currentSession, sendView } from "./shared.mjs";
+import { client, chatOf, currentSession, sendReport, sendView } from "./shared.mjs";
 import { openSessions, showMain } from "./sessions.mjs";
 
 export async function openReport(ctx, chatId, editId) {
@@ -12,10 +13,10 @@ export async function openReport(ctx, chatId, editId) {
     await ctx.tg.send(chatId, "Сначала выбери сессию.");
     return openSessions(ctx, chatId, 0, editId);
   }
-  return openReportFor(ctx, chatId, chat.activeSession, editId);
+  return openReportFor(ctx, chatId, chat.activeSession);
 }
 
-export async function openReportFor(ctx, chatId, sessionId, editId) {
+export async function openReportFor(ctx, chatId, sessionId) {
   const oc = await client(ctx, chatId);
   if (!oc || !sessionId) return;
   try {
@@ -25,7 +26,7 @@ export async function openReportFor(ctx, chatId, sessionId, editId) {
       oc.messages(sessionId, 50, "desc"),
       repoInfo(ctx.config, cwd),
     ]);
-    await sendView(ctx, chatId, reportView({ session, messages, gitInfo: info, cwd }), editId);
+    await sendReport(ctx, chatId, reportView({ session, messages, gitInfo: info, cwd }));
   } catch (error) {
     await ctx.tg.send(chatId, `❌ ${esc(friendlyError(error))}`);
   }
@@ -104,7 +105,13 @@ export async function deleteSession(ctx, chatId, editId) {
   const chat = chatOf(ctx, chatId);
   if (!chat.activeSession) return showMain(ctx, chatId, editId);
   try {
-    await oc.remove(chat.activeSession);
+    const id = chat.activeSession;
+    await oc.remove(id);
+    try {
+      removeSession(oc, id);
+    } catch (error) {
+      ctx.log?.(`groups cleanup failed: ${error?.message || error}`);
+    }
     chat.activeSession = null;
     ctx.store.save();
     await ctx.tg.send(chatId, "🗑 Сессия удалена.");

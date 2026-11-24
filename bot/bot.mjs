@@ -5,6 +5,7 @@ import { Store, loadJson } from "./lib/store.mjs";
 import { Telegram } from "./lib/telegram.mjs";
 import { ServiceManager } from "./lib/opencode.mjs";
 import { Presence } from "./lib/presence.mjs";
+import { configurePrefs } from "./lib/prefs.mjs";
 import { handleUpdate } from "./lib/handlers.mjs";
 import { sleep } from "./lib/format.mjs";
 
@@ -50,12 +51,14 @@ if (!config.token) {
   process.exit(1);
 }
 
+configurePrefs(config.favoritesFile ?? join(root, "data", "favorites.json"));
 const store = new Store(join(root, "state.json"), { offset: 0, chats: {}, servicePath: null });
 for (const chat of Object.values(store.data.chats)) {
   chat.running = false;
   chat.mode = null;
   chat.wizard = null;
   chat.menu = null;
+  chat.noteModel = null;
 }
 store.save();
 const service = new ServiceManager(config, store);
@@ -66,15 +69,18 @@ ctx.presence = new Presence(ctx);
 const commands = [
   { command: "start", description: "Главное меню" },
   { command: "sessions", description: "Сессии" },
+  { command: "groups", description: "Группы сессий" },
   { command: "new", description: "Новая сессия" },
-  { command: "model", description: "Выбрать модель" },
+  { command: "model", description: "Модели, избранное, коннект" },
+  { command: "favorites", description: "Избранные модели с заметками" },
   { command: "agent", description: "Выбрать агента / план" },
   { command: "report", description: "Отчёт по сессии" },
   { command: "git", description: "Git: статус, коммит, пуш" },
   { command: "connections", description: "Провайдеры и MCP" },
   { command: "service", description: "Сервис OpenCode" },
   { command: "status", description: "Статус" },
-  { command: "btw", description: "Вклиниться в работу" },
+  { command: "btw", description: "Вопрос по контексту без изменения истории" },
+  { command: "send", description: "Отправить файл в чат" },
   { command: "stop", description: "Остановить генерацию" },
   { command: "task", description: "Задача с телефона" },
   { command: "help", description: "Помощь" },
@@ -97,11 +103,11 @@ async function main() {
       if (!Array.isArray(updates) || !updates.length) continue;
       for (const update of updates) {
         store.data.offset = update.update_id + 1;
-        try {
-          await handleUpdate(ctx, update);
-        } catch (error) {
-          log(`update ${update.update_id} failed: ${error?.stack || error}`);
-        }
+        const task = handleUpdate(ctx, update)
+          .catch((error) => log(`update ${update.update_id} failed: ${error?.stack || error}`))
+          .finally(() => ctx.tasks?.delete(task));
+        ctx.tasks ??= new Set();
+        ctx.tasks.add(task);
         store.save();
       }
     } catch (error) {

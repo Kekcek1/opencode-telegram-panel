@@ -1,7 +1,25 @@
-import { agentsView, connectionPickerView, hiddenView, modelHomeView, modelsView, providersView } from "../ui.mjs";
+import {
+  agentsView,
+  connectionPickerView,
+  favoritesView,
+  hiddenView,
+  modelHomeView,
+  modelsView,
+  noteView,
+  providersView,
+} from "../ui.mjs";
 import { esc } from "../format.mjs";
 import { friendlyError } from "../opencode.mjs";
-import { decorate, favoriteModels, toggleFavorite, toggleHidden, visible } from "../prefs.mjs";
+import {
+  decorate,
+  favoriteCount,
+  favoriteModels,
+  modelKey,
+  setNote,
+  toggleFavorite,
+  toggleHidden,
+  visible,
+} from "../prefs.mjs";
 import { PAGE, client, chatOf, sendView } from "./shared.mjs";
 import { openSessions, showMain } from "./sessions.mjs";
 
@@ -16,6 +34,7 @@ export async function openModel(ctx, chatId, editId) {
   const models = decorate(ctx.store, await oc.models());
   const credentials = await oc.credentials().catch(() => []);
   const active = credentials.find((item) => item.integrationID === "commandcode" && item.active) ?? null;
+  const availableFavorites = favoriteModels(ctx.store, models).length;
   chat.menu = { kind: "model-home", models, credentials };
   ctx.store.save();
   await sendView(
@@ -23,7 +42,8 @@ export async function openModel(ctx, chatId, editId) {
     chatId,
     modelHomeView({
       activeConnection: active,
-      favoriteCount: favoriteModels(ctx.store, models).length,
+      favoriteCount: favoriteCount(ctx.store),
+      favoriteAvailable: availableFavorites,
       hiddenCount: models.filter((model) => model.hidden).length,
       visibleCount: visible(ctx.store, models).length,
       totalCount: models.length,
@@ -36,8 +56,10 @@ export async function openModelAll(ctx, chatId, editId) {
   const oc = await client(ctx, chatId);
   if (!oc) return;
   const chat = chatOf(ctx, chatId);
-  const models = chat.menu?.models ?? decorate(ctx.store, await oc.models());
-  const allowed = models.filter((model) => !model.hidden);
+  const models = chat.menu?.kind === "model-home" ? chat.menu.models : decorate(ctx.store, await oc.models());
+  const allowed = models
+    .filter((model) => !model.hidden)
+    .sort((a, b) => Number(b.favorite) - Number(a.favorite));
   const providers = await oc.providers().catch(() => []);
   const names = Object.fromEntries(providers.map((provider) => [provider.id, provider.name]));
   const counts = {};
@@ -54,31 +76,98 @@ export async function openModelFavorites(ctx, chatId, editId) {
   const oc = await client(ctx, chatId);
   if (!oc) return;
   const chat = chatOf(ctx, chatId);
-  const models = chat.menu?.models ?? decorate(ctx.store, await oc.models());
+  const models = chat.menu?.kind === "model-home" ? chat.menu.models : decorate(ctx.store, await oc.models());
   const favorites = favoriteModels(ctx.store, models);
   if (!favorites.length) {
-    await ctx.tg.send(chatId, "В избранном пока пусто. Открой «Все модели» и нажми ☆.");
+    const message = favoriteCount(ctx.store)
+      ? "В избранном есть модели, но текущий ключ их не показывает. Смени коннект."
+      : "В избранном пока пусто. Открой «Все модели» и нажми ☆.";
+    await ctx.tg.send(chatId, message);
     return openModel(ctx, chatId, editId);
   }
   chat.menu = {
-    kind: "models",
-    source: "set",
-    title: "⭐ Избранное",
-    subtitle: `${favorites.length} моделей · общее для всех ключей`,
-    prefix: "mm",
+    kind: "favorites",
     models: favorites,
     page: 0,
-    back: "model",
   };
   ctx.store.save();
-  await renderModelsPage(ctx, chatId, 0, editId);
+  await renderFavoritesPage(ctx, chatId, 0, editId);
+}
+
+export async function renderFavoritesPage(ctx, chatId, page, editId) {
+  const chat = chatOf(ctx, chatId);
+  const menu = chat.menu;
+  if (!menu || menu.kind !== "favorites") return openModelFavorites(ctx, chatId, editId);
+  const visibleModels = menu.models.filter((model) => !model.hidden);
+  const pages = Math.max(1, Math.ceil(visibleModels.length / PAGE));
+  const safe = Math.min(Math.max(0, page), pages - 1);
+  const items = visibleModels.slice(safe * PAGE, safe * PAGE + PAGE);
+  menu.page = safe;
+  menu.items = items;
+  ctx.store.save();
+  await sendView(ctx, chatId, favoritesView({ items, page: safe }), editId);
+}
+
+export async function openNoteEditor(ctx, chatId, index, editId) {
+  const chat = chatOf(ctx, chatId);
+  const model = chat.menu?.items?.[index] ?? chat.menu?.models?.[index];
+  if (!model) return openModelFavorites(ctx, chatId, editId);
+  const target = { ...model, index };
+  chat.mode = "favorite-note";
+  chat.noteModel = {
+    providerID: model.providerID,
+    id: model.id,
+    name: model.name,
+    note: model.note,
+  };
+  ctx.store.save();
+  await sendView(ctx, chatId, noteView({ model: target }), editId);
+}
+
+export async function saveFavoriteNote(ctx, chatId, text) {
+  const chat = chatOf(ctx, chatId);
+  const model = chat.noteModel;
+  if (!model) {
+    chat.mode = null;
+    ctx.store.save();
+    return openModelFavorites(ctx, chatId);
+  }
+  const note = text.trim() === "-" ? "" : text.trim();
+  setNote(ctx.store, model, note);
+  chat.mode = null;
+  chat.noteModel = null;
+  ctx.store.save();
+  await ctx.tg.send(chatId, note ? "📝 Заметка сохранена." : "📝 Заметка очищена.");
+  return openModelFavorites(ctx, chatId);
+}
+
+export async function clearFavoriteNote(ctx, chatId, index, editId) {
+  const chat = chatOf(ctx, chatId);
+  const model = chat.menu?.items?.[index] ?? chat.menu?.models?.[index];
+  if (!model) return openModelFavorites(ctx, chatId, editId);
+  setNote(ctx.store, model, "");
+  return renderFavoritesPage(ctx, chatId, chat.menu.page ?? 0, editId);
+}
+
+export async function removeFavoriteModel(ctx, chatId, index, editId) {
+  const chat = chatOf(ctx, chatId);
+  const model = chat.menu?.items?.[index] ?? chat.menu?.models?.[index];
+  if (!model) return openModelFavorites(ctx, chatId, editId);
+  if (model.favorite) toggleFavorite(ctx.store, model);
+  chat.menu = { ...chat.menu, models: (chat.menu.models ?? []).filter((item) => modelKey(item) !== modelKey(model)) };
+  if (!chat.menu.models.length) {
+    await ctx.tg.send(chatId, "Избранное пусто.");
+    return openModel(ctx, chatId, editId);
+  }
+  return renderFavoritesPage(ctx, chatId, Math.min(chat.menu.page ?? 0, Math.ceil(chat.menu.models.length / PAGE) - 1), editId);
 }
 
 export async function openHidden(ctx, chatId, editId) {
   const oc = await client(ctx, chatId);
   if (!oc) return;
   const chat = chatOf(ctx, chatId);
-  chat.menu = { kind: "hidden", models: chat.menu?.models ?? decorate(ctx.store, await oc.models()), page: 0 };
+  const models = chat.menu?.kind === "model-home" ? chat.menu.models : decorate(ctx.store, await oc.models());
+  chat.menu = { kind: "hidden", models, page: 0 };
   ctx.store.save();
   await renderHiddenPage(ctx, chatId, 0, editId);
 }
@@ -87,9 +176,10 @@ export async function renderHiddenPage(ctx, chatId, page, editId) {
   const chat = chatOf(ctx, chatId);
   const menu = chat.menu;
   if (!menu || menu.kind !== "hidden") return openHidden(ctx, chatId, editId);
-  const pages = Math.max(1, Math.ceil(menu.models.length / PAGE));
+  const hidden = menu.models.filter((model) => model.hidden);
+  const pages = Math.max(1, Math.ceil(hidden.length / PAGE));
   const safe = Math.min(Math.max(0, page), pages - 1);
-  const items = menu.models.slice(safe * PAGE, safe * PAGE + PAGE);
+  const items = hidden.slice(safe * PAGE, safe * PAGE + PAGE);
   menu.page = safe;
   menu.items = items;
   ctx.store.save();
@@ -103,6 +193,7 @@ export async function toggleFavoriteModel(ctx, chatId, index, editId) {
   model.favorite = toggleFavorite(ctx.store, model);
   ctx.store.save();
   if (chat.menu.kind === "hidden") return renderHiddenPage(ctx, chatId, chat.menu.page ?? 0, editId);
+  if (chat.menu.kind === "favorites") return renderFavoritesPage(ctx, chatId, chat.menu.page ?? 0, editId);
   if (chat.menu.kind === "models") return renderModelsPage(ctx, chatId, chat.menu.page ?? 0, editId);
   return openModel(ctx, chatId, editId);
 }
@@ -114,6 +205,8 @@ export async function toggleHiddenModel(ctx, chatId, index, editId) {
   model.hidden = toggleHidden(ctx.store, model);
   ctx.store.save();
   if (chat.menu.kind === "hidden") return renderHiddenPage(ctx, chatId, chat.menu.page ?? 0, editId);
+  if (chat.menu.kind === "favorites") return renderFavoritesPage(ctx, chatId, chat.menu.page ?? 0, editId);
+  if (chat.menu.kind === "models") return renderModelsPage(ctx, chatId, chat.menu.page ?? 0, editId);
   return openModel(ctx, chatId, editId);
 }
 
@@ -142,44 +235,14 @@ export async function selectConnection(ctx, chatId, index, editId) {
   await openModel(ctx, chatId, editId);
 }
 
-export async function openModelSearch(ctx, chatId, query, editId) {
-  const oc = await client(ctx, chatId);
-  if (!oc) return;
-  const chat = chatOf(ctx, chatId);
-  if (!chat.activeSession) {
-    await ctx.tg.send(chatId, "Сначала выбери сессию.");
-    return openSessions(ctx, chatId, 0, editId);
-  }
-  const needle = query.toLowerCase();
-  const found = visible(ctx.store, await oc.models())
-    .filter((model) => model.id.toLowerCase().includes(needle) || String(model.name || "").toLowerCase().includes(needle))
-    .sort((a, b) => Number(b.favorite) - Number(a.favorite));
-  if (!found.length) {
-    await ctx.tg.send(chatId, `Модели по запросу «${esc(query)}» не найдены.`);
-    return;
-  }
-  chat.menu = {
-    kind: "models",
-    source: "set",
-    provider: "search",
-    title: `Поиск: ${query}`,
-    subtitle: `${found.length} моделей · ⭐ сверху`,
-    prefix: "mm",
-    models: found,
-    page: 0,
-    back: "model",
-  };
-  ctx.store.save();
-  await renderModelsPage(ctx, chatId, 0, editId);
-}
-
 export async function renderModelsPage(ctx, chatId, page, editId) {
   const chat = chatOf(ctx, chatId);
   const menu = chat.menu;
   if (!menu || menu.kind !== "models") return showMain(ctx, chatId, editId);
-  const pages = Math.max(1, Math.ceil(menu.models.length / PAGE));
+  const visibleModels = menu.models.filter((model) => !model.hidden);
+  const pages = Math.max(1, Math.ceil(visibleModels.length / PAGE));
   const safe = Math.min(Math.max(0, page), pages - 1);
-  const items = menu.models.slice(safe * PAGE, safe * PAGE + PAGE);
+  const items = visibleModels.slice(safe * PAGE, safe * PAGE + PAGE);
   menu.page = safe;
   menu.items = items;
   ctx.store.save();

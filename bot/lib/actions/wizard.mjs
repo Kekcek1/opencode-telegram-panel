@@ -1,27 +1,40 @@
-import { agentsView, dirsView, modelsView, providersView, variantsView } from "../ui.mjs";
+import { mkdirSync } from "node:fs";
+import { join } from "node:path";
+import { agentsView, dirsView, providersView, variantsView } from "../ui.mjs";
 import { esc, fmtDate, modelTitle, sessionTitle } from "../format.mjs";
 import { friendlyError } from "../opencode.mjs";
 import { decorate, modelRef, visible } from "../prefs.mjs";
-import { PAGE, client, chatOf, sendView } from "./shared.mjs";
+import { client, chatOf, sendView } from "./shared.mjs";
 import { showMain } from "./sessions.mjs";
+import { renderModelsPage } from "./models.mjs";
 
 export async function openNew(ctx, chatId, editId) {
+  const chat = chatOf(ctx, chatId);
+  chat.wizard = { directory: ctx.config.sessionRoot || "G:\\sessions", model: null, agent: null };
+  ctx.store.save();
+  await openNewProviders(ctx, chatId, editId);
+}
+
+async function openNewProviders(ctx, chatId, editId) {
   const oc = await client(ctx, chatId);
   if (!oc) return;
   const chat = chatOf(ctx, chatId);
-  const sessions = await oc.sessions(30).catch(() => []);
-  const dirs = [
-    ...new Set([
-      ...sessions.map((s) => s.location?.directory).filter(Boolean),
-      ctx.config.defaultDirectory,
-      "G:\\",
-      "C:\\Users\\utubk",
-    ]),
-  ].slice(0, 12);
-  chat.wizard = { directory: null, model: null, agent: null };
-  chat.menu = { kind: "dirs", dirs };
+  const models = decorate(ctx.store, await oc.models());
+  const providers = await oc.providers().catch(() => []);
+  const names = Object.fromEntries(providers.map((p) => [p.id, p.name]));
+  const counts = {};
+  for (const model of visible(ctx.store, models)) counts[model.providerID] = (counts[model.providerID] || 0) + 1;
+  const items = Object.keys(counts)
+    .map((id) => ({ id, name: names[id] || id, count: counts[id] }))
+    .sort((a, b) => b.count - a.count);
+  chat.menu = { kind: "providers", source: "new", providers: items, models };
   ctx.store.save();
-  await sendView(ctx, chatId, dirsView({ items: dirs }), editId);
+  await sendView(
+    ctx,
+    chatId,
+    providersView({ items, prefix: "np", title: "Шаг 1/3. Провайдер" }),
+    editId,
+  );
 }
 
 export async function pickDir(ctx, chatId, index, editId) {
@@ -65,24 +78,6 @@ export async function pickProvider(ctx, chatId, index, editId, source = "new") {
   };
   ctx.store.save();
   await renderModelsPage(ctx, chatId, 0, editId);
-}
-
-export async function renderModelsPage(ctx, chatId, page, editId) {
-  const chat = chatOf(ctx, chatId);
-  const menu = chat.menu;
-  if (!menu || menu.kind !== "models") return showMain(ctx, chatId, editId);
-  const pages = Math.max(1, Math.ceil(menu.models.length / PAGE));
-  const safe = Math.min(Math.max(0, page), pages - 1);
-  const items = menu.models.slice(safe * PAGE, safe * PAGE + PAGE);
-  menu.page = safe;
-  menu.items = items;
-  ctx.store.save();
-  await sendView(
-    ctx,
-    chatId,
-    modelsView({ items, page: safe, prefix: menu.prefix, title: menu.title, subtitle: menu.subtitle, back: menu.back ?? "home" }),
-    editId,
-  );
 }
 
 export async function pickModel(ctx, chatId, index, editId, source = "new") {
@@ -157,19 +152,36 @@ async function createWizardSession(ctx, chatId, editId) {
   const chat = chatOf(ctx, chatId);
   const wizard = chat.wizard || {};
   const model = modelRef(wizard.model || ctx.config.defaultModel);
+  const root = ctx.config.sessionRoot || "G:\\sessions";
   try {
     const session = await oc.createSession({
       title: `TG · ${fmtDate(Date.now())}`,
-      directory: wizard.directory || ctx.config.defaultDirectory,
+      directory: root,
       model,
       agent: wizard.agent || ctx.config.defaultAgent,
     });
+    const directory = join(root, session.id);
+    mkdirSync(directory, { recursive: true });
+    let moveError = null;
+    try {
+      await oc.move(session.id, directory, "steer");
+    } catch (error) {
+      moveError = friendlyError(error);
+    }
     chat.activeSession = session.id;
     chat.gitCwd = null;
     chat.wizard = null;
     chat.menu = null;
     ctx.store.save();
-    await ctx.tg.send(chatId, `✅ Сессия создана: <b>${esc(sessionTitle(session))}</b>\n<code>${esc(modelTitle(model))}</code> · ${esc(session.agent ?? "")}`);
+    await ctx.tg.send(
+      chatId,
+      [
+        `✅ Сессия создана: <b>${esc(sessionTitle(session))}</b>`,
+        `<code>${esc(modelTitle(model))}</code> · ${esc(session.agent ?? "")}`,
+        `📁 <code>${esc(directory)}</code>`,
+        moveError ? `⚠️ Папку не удалось переключить: ${esc(moveError)}` : "",
+      ].filter(Boolean).join("\n"),
+    );
     await showMain(ctx, chatId, editId);
   } catch (error) {
     await ctx.tg.send(chatId, `❌ ${esc(friendlyError(error))}`);

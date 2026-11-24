@@ -569,8 +569,8 @@
           </article>
           <article class="card third reveal">
             <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5"/><path d="M4 19h16"/><path d="m7 15 4-5 3 3 5-7"/></svg></div>
-            <h3>Отчёты</h3>
-            <p>Токены, стоимость, модель, агент, последний ответ и Git-статус. Без похода в TUI.</p>
+            <h3>Отчёты и async</h3>
+            <p>Токены, стоимость, инструменты, последний ответ и Git. Пока модель пишет, меню и кнопки продолжают отвечать.</p>
           </article>
           <article class="card wide reveal">
             <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 7V4h6v3"/><rect x="4" y="7" width="16" height="13" rx="2"/><path d="M8 12h8"/><path d="M8 16h5"/></svg></div>
@@ -592,9 +592,27 @@
           </article>
           <article class="card wide reveal">
             <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3 6.4 20.2l1.1-6.2L3 9.6l6.2-.9L12 3Z"/></svg></div>
-            <h3>Избранное и скрытые модели</h3>
-            <p>Отметь звёздочкой нужные модели и убери лишние. Избранное общее для всех ключей CommandCode, а переключение <code>Command My</code> / <code>Comande Team</code> — в том же меню.</p>
-            <span class="chip">/favorites · ☆ → ⭐</span>
+            <h3>Избранное с заметками</h3>
+            <p>Отметь звёздочкой нужные модели, добавь заметку и убери лишние. Файл <code>data/favorites.json</code> общий для всех ключей CommandCode, а переключение <code>Command My</code> / <code>Comande Team</code> — в том же меню.</p>
+            <span class="chip">/favorites · ⭐ + 📝</span>
+          </article>
+          <article class="card wide reveal">
+            <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v5h5"/><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-5Z"/><path d="M8 13h8"/><path d="M8 17h5"/></svg></div>
+            <h3>Файлы из модели</h3>
+            <p>Модель отправляет любой файл командой <code>tg-send.cmd</code>, а <code>/send путь</code> делает это вручную. Бот также relay'ит файл, если в промте есть просьба «пришли файл» и путь.</p>
+            <span class="chip">/send · до 50 МБ</span>
+          </article>
+          <article class="card wide reveal">
+            <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h7l2 2h9v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><path d="M3 7V5a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2"/></svg></div>
+            <h3>Группы и своя папка</h3>
+            <p><code>/groups</code> читает тот же <code>session-folders.json</code>, что TUI-плагин. Сессии можно переносить, переименовывать группы и удалять. Новая сессия живёт в <code>G:\sessions\&lt;id&gt;</code>.</p>
+            <span class="chip">/groups · ⚙️</span>
+          </article>
+          <article class="card wide reveal">
+            <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9h10"/><path d="M7 13h6"/><path d="m16 17 3-3-3-3"/></svg></div>
+            <h3>Одно меню и честный /btw</h3>
+            <p>Старое навигационное сообщение удаляется, поэтому панели не копятся. <code>/btw</code> отвечает по контексту через <code>session.generate</code> и не добавляет промт в историю сессии.</p>
+            <span class="chip">/btw · без мусора</span>
           </article>
         </div>
       </div>
@@ -671,14 +689,16 @@ status.cmd</span></pre>
             <thead><tr><th>Команда</th><th>Что делает</th></tr></thead>
             <tbody>
               <tr><td><code>/start</code></td><td>Главное меню: сессия, модель, агент, Git, отчёт.</td></tr>
-              <tr><td><code>/sessions</code></td><td>Список сессий, выбор активной, «взять с ПК».</td></tr>
-              <tr><td><code>/new</code></td><td>Новая сессия: папка → провайдер → модель → агент.</td></tr>
+              <tr><td><code>/sessions</code></td><td>Список сессий, действия, удаление, «взять с ПК».</td></tr>
+              <tr><td><code>/groups</code></td><td>Группы сессий, общие с плагином TUI.</td></tr>
+              <tr><td><code>/new</code></td><td>Новая сессия в <code>G:\sessions\&lt;id&gt;</code>: провайдер → модель → агент.</td></tr>
               <tr><td><code>/model</code></td><td>Модели, избранное, скрытые, коннект; <code>/model deepseek</code> — поиск.</td></tr>
-              <tr><td><code>/favorites</code></td><td>Только избранные модели.</td></tr>
+              <tr><td><code>/favorites</code></td><td>Избранные модели с заметками.</td></tr>
+              <tr><td><code>/send путь</code></td><td>Отправить файл в Telegram.</td></tr>
               <tr><td><code>/agent</code>, <code>/plan</code></td><td>Сменить агента или план.</td></tr>
               <tr><td><code>/live</code></td><td>Обновить закреплённую live-панель активных сессий.</td></tr>
               <tr><td><code>/task текст</code></td><td>Быстрая задача с телефона; создаст сессию при необходимости.</td></tr>
-              <tr><td><code>/btw текст</code></td><td>Вклиниться в текущую работу через <code>delivery: steer</code>.</td></tr>
+              <tr><td><code>/btw вопрос</code></td><td>Боковой ответ по контексту через <code>session.generate</code>, без изменения истории.</td></tr>
               <tr><td><code>/report</code></td><td>Токены, стоимость, модель, последний ответ, Git.</td></tr>
               <tr><td><code>/git</code></td><td>Статус, коммит, push, pull, история, ветки, выбор репо.</td></tr>
               <tr><td><code>/connections</code></td><td>Провайдеры, активные ключи, MCP.</td></tr>

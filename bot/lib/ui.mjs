@@ -30,7 +30,7 @@ export function mainView({ botName, service, session, activeMap, running }) {
     lines.push("Сессия: <i>не выбрана</i>");
   }
   const rows = [
-    [{ text: "📋 Сессии", callback_data: "sessions" }, { text: "➕ Новая", callback_data: "new" }],
+    [{ text: "📋 Сессии", callback_data: "sessions" }, { text: "📁 Группы", callback_data: "groups" }, { text: "➕ Новая", callback_data: "new" }],
     [{ text: "🧠 Модель", callback_data: "model" }, { text: "🎛 Агент / план", callback_data: "agent" }],
     [{ text: "✍️ Задача", callback_data: "prompt" }, { text: "📊 Отчёт", callback_data: "report" }],
     [{ text: "🔌 Коннекты", callback_data: "connections" }, { text: "🌿 Git", callback_data: "git" }],
@@ -41,24 +41,27 @@ export function mainView({ botName, service, session, activeMap, running }) {
   return { text: lines.join("\n"), keyboard: kb(rows) };
 }
 
-export function sessionsView({ items, page, activeId, activeMap, hasNext }) {
-  const lines = [`<b>📋 Сессии</b> · стр. ${page + 1}`];
+export function sessionsView({ items, page, activeId, activeMap, title = "📋 Сессии", groups = {}, group = null, pagePrefix = "slist", back = "home", extraRows = [] }) {
+  const lines = [`<b>${esc(title)}</b> · стр. ${page + 1}`];
   if (!items.length) lines.push("Пусто.");
   items.forEach((s, index) => {
     const mark = s.id === activeId ? "✅" : activeMap?.[s.id] ? "🟠" : "•";
+    const groupName = group ?? groups[s.id];
     lines.push(
-      `${mark} <b>${esc(clip(sessionTitle(s), 40))}</b>\n   ${fmtDate(s.time?.updated)} · <code>${esc(modelTitle(s.model))}</code> · ${fmtCost(s.cost)}`,
+      `${mark} <b>${esc(clip(sessionTitle(s), 40))}</b>${groupName ? ` · 📁 ${esc(clip(groupName, 28))}` : ""}\n   ${fmtDate(s.time?.updated)} · <code>${esc(modelTitle(s.model))}</code> · ${fmtCost(s.cost)}`,
     );
   });
   const rows = items.map((s, index) => [
-    { text: `${index + 1}. ${clip(sessionTitle(s), 42)}`, callback_data: `si:${index}` },
+    { text: `${index + 1}. ${clip(sessionTitle(s), 36)}`, callback_data: `si:${index}` },
+    { text: "⚙️", callback_data: `sdet:${index}` },
   ]);
   rows.push([
-    { text: "⬅️", callback_data: `slist:${Math.max(0, page - 1)}` },
-    { text: "➡️", callback_data: `slist:${page + 1}` },
+    { text: "⬅️", callback_data: `${pagePrefix}:${Math.max(0, page - 1)}` },
+    { text: "➡️", callback_data: `${pagePrefix}:${page + 1}` },
   ]);
-  rows.push([{ text: "🖥 Взять с ПК", callback_data: "sess:pc" }]);
-  rows.push(home);
+  for (const row of extraRows) rows.push(row);
+  rows.push([{ text: "📁 Группы", callback_data: "groups" }, { text: "🖥 Взять с ПК", callback_data: "sess:pc" }]);
+  rows.push([{ text: back === "groups" ? "⬅️ Группы" : "🏠 Меню", callback_data: back }]);
   return { text: lines.join("\n"), keyboard: kb(rows) };
 }
 
@@ -229,16 +232,19 @@ export function helpView() {
     "Сессии общие с ПК: бот работает через тот же сервис OpenCode.",
     "",
     "<b>Команды</b>",
-    "/sessions — список и выбор сессии",
+    "/sessions — список, выбор, удаление и действия",
+    "/groups — группы сессий как в плагине",
     "/new — новая сессия",
-    "/model — сменить модель",
+    "/model — модели, избранное, скрытые, коннект",
+    "/favorites — избранное с заметками",
     "/agent или /plan — сменить агента",
     "/report — отчёт по сессии",
     "/git — статус, коммит, пуш",
     "/connections — провайдеры, ключи, MCP",
     "/service — выбрать сервис",
     "/status — состояние",
-    "/btw текст — вклиниться в текущую работу",
+    "/btw вопрос — ответ по контексту без изменения истории",
+    "/send путь — отправить файл в чат",
     "/stop — прервать генерацию",
     "/rename текст — переименовать сессию",
     "/delete — удалить сессию",
@@ -258,5 +264,6 @@ export function confirmDelete({ session }) {
   };
 }
 
-export { modelsView, hiddenView, modelHomeView, connectionPickerView } from "./ui-models.mjs";
+export { connectionPickerView, favoritesView, hiddenView, modelHomeView, modelsView, noteView } from "./ui-models.mjs";
+export { confirmDeleteGroup, confirmDeleteSession, groupPickerView, groupsView, renamePrompt, sessionDetailView } from "./ui-groups.mjs";
 export { reportView, finishView, liveView } from "./ui-reports.mjs";

@@ -85,13 +85,14 @@ export class OpenCodeClient {
     this.url = service.url;
     this.password = service.password;
     this.info = service.info;
+    this.statePath = service.statePath;
   }
 
   locationQuery(directory) {
     return directory ? `?location[directory]=${encodeURIComponent(directory)}` : "";
   }
 
-  async request(method, path, body) {
+  async request(method, path, body, timeoutMs = 45000) {
     let response;
     try {
       response = await fetch(this.url + path, {
@@ -101,7 +102,7 @@ export class OpenCodeClient {
           "content-type": "application/json",
         },
         body: body === undefined ? undefined : JSON.stringify(body),
-        signal: AbortSignal.timeout(45000),
+        signal: AbortSignal.timeout(timeoutMs),
       });
     } catch (error) {
       throw new OpenCodeError(0, path, `сеть: ${error.message}`);
@@ -176,7 +177,16 @@ export class OpenCodeClient {
   }
 
   async prompt(id, text, delivery = "queue") {
-    return (await this.request("POST", `/api/session/${id}/prompt`, { text, delivery }))?.data;
+    return (await this.request("POST", `/api/session/${id}/prompt`, { text, delivery }, 90000))?.data;
+  }
+
+  async generate(id, prompt) {
+    const body = await this.request("POST", `/api/session/${id}/generate`, { prompt }, 180000);
+    return body?.data?.text ?? "";
+  }
+
+  async commands(directory) {
+    return (await this.request("GET", `/api/command${this.locationQuery(directory)}`))?.data ?? [];
   }
 
   async setModel(id, model) {
@@ -189,6 +199,10 @@ export class OpenCodeClient {
 
   async rename(id, title) {
     await this.request("PATCH", `/api/session/${id}`, { title });
+  }
+
+  async move(id, directory, delivery = "steer") {
+    await this.request("POST", `/api/session/${id}/move`, { directory, delivery });
   }
 
   async remove(id) {

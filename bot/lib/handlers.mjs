@@ -1,27 +1,11 @@
-import { appendFileSync } from "node:fs";
-import { join } from "node:path";
 import * as actions from "./actions.mjs";
-import { runPrompt } from "./prompt.mjs";
+import { sessionRoute } from "./actions/routes.mjs";
+import { allowed, logAccess } from "./auth.mjs";
+import { btwCommand, runPrompt } from "./prompt.mjs";
 import { fmtDate, esc } from "./format.mjs";
 import { friendlyError } from "./opencode.mjs";
+import { sendFileCommand } from "./files.mjs";
 import { modelRef } from "./prefs.mjs";
-
-function allowed(config, from) {
-  const id = config.allowedId ? String(config.allowedId) : "";
-  const username = String(config.allowedUsername || "").replace(/^@/, "").toLowerCase();
-  if (id) return String(from.id) === id;
-  return Boolean(username && String(from.username || "").toLowerCase() === username);
-}
-
-function logAccess(config, from, text) {
-  try {
-    appendFileSync(
-      join(config.root, "access.log"),
-      `${new Date().toISOString()} id=${from.id} username=@${from.username || "-"} text=${JSON.stringify(String(text || "").slice(0, 200))}\n`,
-      "utf8",
-    );
-  } catch {}
-}
 
 function parseCommand(text) {
   const match = text.match(/^\/([A-Za-z0-9_]+)(?:@\w+)?(?:\s+([\s\S]*))?$/);
@@ -93,6 +77,8 @@ async function command(ctx, msg, chatId, parsed) {
       );
     case "sessions":
       return actions.openSessions(ctx, chatId, 0);
+    case "groups":
+      return actions.openGroups(ctx, chatId);
     case "new":
       return actions.openNew(ctx, chatId);
     case "model":
@@ -127,9 +113,9 @@ async function command(ctx, msg, chatId, parsed) {
     case "service":
       return actions.openService(ctx, chatId);
     case "btw":
-      if (!arg) return ctx.tg.send(chatId, "Напиши текст после /btw.");
-      if (!chat.activeSession) return ctx.tg.send(chatId, "Сначала выбери сессию.");
-      return runPrompt(ctx, chatId, arg, { delivery: "steer", label: "BTW" });
+      return btwCommand(ctx, chatId, arg);
+    case "send":
+      return sendFileCommand(ctx, chatId, arg);
     case "stop":
       return stop(ctx, chatId);
     case "task":
@@ -151,6 +137,11 @@ async function command(ctx, msg, chatId, parsed) {
       chat.mode = null;
       chat.wizard = null;
       chat.menu = null;
+      chat.noteModel = null;
+      chat.detail = null;
+      chat.groupPicker = null;
+      chat.deleteTarget = null;
+      chat.deleteGroup = null;
       ctx.store.save();
       return actions.showMain(ctx, chatId);
     case "git": {
@@ -180,11 +171,7 @@ async function callback(ctx, query) {
   const index = Number(tail);
 
   if (head === "home") return actions.showMain(ctx, chatId, editId);
-  if (head === "sessions") return actions.openSessions(ctx, chatId, 0, editId);
-  if (head === "slist") return actions.openSessions(ctx, chatId, Number(tail) || 0, editId);
-  if (head === "si") return actions.pickSession(ctx, chatId, index, editId);
-  if (head === "sess" && tail === "pc") return actions.takePcSession(ctx, chatId, editId);
-  if (head === "sess" && tail === "del") return actions.deleteSession(ctx, chatId, editId);
+  if (await sessionRoute(ctx, chatId, head, tail, index, editId)) return;
   if (head === "new") return actions.openNew(ctx, chatId, editId);
   if (head === "nd") return actions.pickDir(ctx, chatId, index, editId);
   if (head === "np") return actions.pickProvider(ctx, chatId, index, editId, "new");
@@ -197,8 +184,15 @@ async function callback(ctx, query) {
   if (head === "mhidden") return actions.openHidden(ctx, chatId, editId);
   if (head === "fav") return actions.toggleFavoriteModel(ctx, chatId, index, editId);
   if (head === "hid") return actions.toggleHiddenModel(ctx, chatId, index, editId);
+  if (head === "fpg") return actions.renderFavoritesPage(ctx, chatId, Number(tail) || 0, editId);
+  if (head === "fnote") return actions.openNoteEditor(ctx, chatId, index, editId);
+  if (head === "fclear") return actions.clearFavoriteNote(ctx, chatId, index, editId);
+  if (head === "funfav") return actions.removeFavoriteModel(ctx, chatId, index, editId);
   if (head === "cc" && tail === "list") return actions.openConnectionPicker(ctx, chatId, editId);
   if (head === "cc") return actions.selectConnection(ctx, chatId, index, editId);
+  if (head === "nav") return actions.showMain(ctx, chatId);
+  if (head === "navs") return actions.openSessions(ctx, chatId, 0);
+  if (head === "navnew") return actions.openNew(ctx, chatId);
   if (head === "live") return ctx.presence?.refresh(chatId);
   if (head === "rpt") return actions.openReportFor(ctx, chatId, tail, editId);
   if (head === "opn") return actions.openSessionById(ctx, chatId, tail, editId);
@@ -280,6 +274,18 @@ export async function handleUpdate(ctx, update) {
       ctx.store.save();
       await ctx.tg.send(chatId, `✏️ Переименовано: <b>${esc(text)}</b>`);
       return actions.showMain(ctx, chatId);
+    }
+    if (chat.mode === "favorite-note") {
+      return actions.saveFavoriteNote(ctx, chatId, text);
+    }
+    if (chat.mode === "group-create" || chat.mode === "group-new") {
+      return actions.finishGroupName(ctx, chatId, text, undefined);
+    }
+    if (chat.mode === "group-rename") {
+      return actions.finishGroupRename(ctx, chatId, text, undefined);
+    }
+    if (chat.mode === "session-rename") {
+      return actions.finishSessionRename(ctx, chatId, text, undefined);
     }
     if (!chat.activeSession) {
       await ctx.tg.send(chatId, "Сессия не выбрана. Открой /sessions или создай /new.");
