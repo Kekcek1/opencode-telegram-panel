@@ -240,6 +240,7 @@ export function helpView() {
     "/id — твой Telegram ID",
     "",
     "Обычный текст отправляется в выбранную сессию.",
+    "Файл, фото или голосовое — бот сохранит в uploads сессии и передаст модели.",
   ].join("\n");
   return { text, keyboard: kb([home]) };
 }
