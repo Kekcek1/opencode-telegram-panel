@@ -2,10 +2,10 @@ import * as actions from "./actions.mjs";
 import { sessionRoute } from "./actions/routes.mjs";
 import { allowed, logAccess } from "./auth.mjs";
 import { btwCommand, runPrompt } from "./prompt.mjs";
-import { fmtDate, esc } from "./format.mjs";
+import { esc } from "./format.mjs";
 import { friendlyError } from "./opencode.mjs";
 import { sendFileCommand } from "./files.mjs";
-import { modelRef } from "./prefs.mjs";
+import { receiveFile } from "./uploads.mjs";
 
 function parseCommand(text) {
   const match = text.match(/^\/([A-Za-z0-9_]+)(?:@\w+)?(?:\s+([\s\S]*))?$/);
@@ -25,31 +25,6 @@ async function stop(ctx, chatId) {
   const oc = await ctx.service.client();
   await oc.interrupt(chat.activeSession);
   await ctx.tg.send(chatId, "⏹ Остановка отправлена.");
-}
-
-async function quickTask(ctx, chatId, text) {
-  const chat = ctx.store.chat(chatId);
-  if (chat.activeSession) {
-    await runPrompt(ctx, chatId, text);
-    return;
-  }
-  const oc = await ctx.service.client();
-  const models = await oc.models();
-  const found =
-    models.find((item) => item.providerID === ctx.config.defaultModel.providerID && item.id === ctx.config.defaultModel.id) ||
-    models.find((item) => item.enabled);
-  const model = found ? modelRef(found) : ctx.config.defaultModel;
-  const agent = ctx.config.defaultAgent || "build";
-  const session = await oc.createSession({
-    title: `TG task · ${fmtDate(Date.now())}`,
-    directory: ctx.config.defaultDirectory,
-    model,
-    agent,
-  });
-  chat.activeSession = session.id;
-  ctx.store.save();
-  await ctx.tg.send(chatId, `✅ Задача создана в <b>${esc(session.title)}</b>`);
-  await runPrompt(ctx, chatId, text);
 }
 
 async function command(ctx, msg, chatId, parsed) {
@@ -120,7 +95,7 @@ async function command(ctx, msg, chatId, parsed) {
       return stop(ctx, chatId);
     case "task":
       if (!arg) return ctx.tg.send(chatId, "Напиши задачу после /task.");
-      return quickTask(ctx, chatId, arg);
+      return actions.quickTask(ctx, chatId, arg);
     case "rename":
       if (!arg) {
         chat.mode = "rename";
@@ -173,7 +148,6 @@ async function callback(ctx, query) {
   if (head === "home") return actions.showMain(ctx, chatId, editId);
   if (await sessionRoute(ctx, chatId, head, tail, index, editId)) return;
   if (head === "new") return actions.openNew(ctx, chatId, editId);
-  if (head === "nd") return actions.pickDir(ctx, chatId, index, editId);
   if (head === "np") return actions.pickProvider(ctx, chatId, index, editId, "new");
   if (head === "nm") return actions.pickModel(ctx, chatId, index, editId, "new");
   if (head === "nv") return actions.pickVariant(ctx, chatId, index, editId, "new");
@@ -251,8 +225,12 @@ export async function handleUpdate(ctx, update) {
     return;
   }
 
-  if (!msg?.text) return;
+  if (!msg) return;
   const chatId = msg.chat.id;
+  if (msg.document || msg.photo || msg.audio || msg.voice || msg.video || msg.animation) {
+    return receiveFile(ctx, chatId, msg);
+  }
+  if (!msg.text) return;
   const text = msg.text.trim();
   const parsed = text.startsWith("/") ? parseCommand(text) : null;
   const chat = ctx.store.chat(chatId);

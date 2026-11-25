@@ -5,6 +5,7 @@ export * from "./actions/session-detail.mjs";
 export * from "./actions/wizard.mjs";
 export * from "./actions/models.mjs";
 export * from "./actions/search.mjs";
+export * from "./actions/task.mjs";
 export * from "./actions/connections.mjs";
 export * from "./actions/git.mjs";
 export * from "./actions/report.mjs";

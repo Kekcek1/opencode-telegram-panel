@@ -156,13 +156,15 @@ async function executePrompt(ctx, { chat, chatId, sessionId, text, options }) {
     ctx.lastPromptReports ??= {};
     ctx.lastPromptReports[sessionId] = Date.now();
 
-    const files = collectPromptFiles({
-      messages,
-      directory: sessionNow?.location?.directory ?? session.location?.directory,
-      promptText: text,
-      started,
-    });
-    for (const file of files) await sendPath(ctx, chatId, file, { quiet: true });
+    if (options.sendFiles !== false) {
+      const files = collectPromptFiles({
+        messages,
+        directory: sessionNow?.location?.directory ?? session.location?.directory,
+        promptText: text,
+        started,
+      });
+      for (const file of files) await sendPath(ctx, chatId, file, { quiet: true });
+    }
   } catch (error) {
     const message = friendlyError(error);
     if (progressId) await ctx.tg.edit(chatId, progressId, `❌ <b>Ошибка</b>\n${esc(clip(message, 1800))}`).catch(() => {});

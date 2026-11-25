@@ -1,6 +1,6 @@
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { agentsView, dirsView, providersView, variantsView } from "../ui.mjs";
+import { agentsView, providersView, variantsView } from "../ui.mjs";
 import { esc, fmtDate, modelTitle, sessionTitle } from "../format.mjs";
 import { friendlyError } from "../opencode.mjs";
 import { decorate, modelRef, visible } from "../prefs.mjs";
@@ -35,27 +35,6 @@ async function openNewProviders(ctx, chatId, editId) {
     providersView({ items, prefix: "np", title: "Шаг 1/3. Провайдер" }),
     editId,
   );
-}
-
-export async function pickDir(ctx, chatId, index, editId) {
-  const oc = await client(ctx, chatId);
-  if (!oc) return;
-  const chat = chatOf(ctx, chatId);
-  const directory = chat.menu?.dirs?.[index];
-  if (!directory) return openNew(ctx, chatId, editId);
-  chat.wizard ??= {};
-  chat.wizard.directory = directory;
-  const models = decorate(ctx.store, await oc.models());
-  const providers = await oc.providers().catch(() => []);
-  const names = Object.fromEntries(providers.map((p) => [p.id, p.name]));
-  const counts = {};
-  for (const model of visible(ctx.store, models)) counts[model.providerID] = (counts[model.providerID] || 0) + 1;
-  const items = Object.keys(counts)
-    .map((id) => ({ id, name: names[id] || id, count: counts[id] }))
-    .sort((a, b) => b.count - a.count);
-  chat.menu = { kind: "providers", source: "new", providers: items, models };
-  ctx.store.save();
-  await sendView(ctx, chatId, providersView({ items, prefix: "np", title: "Шаг 2/3. Провайдер" }), editId);
 }
 
 export async function pickProvider(ctx, chatId, index, editId, source = "new") {

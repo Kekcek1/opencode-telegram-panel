@@ -65,17 +65,6 @@ export function sessionsView({ items, page, activeId, activeMap, title = "📋 �
   return { text: lines.join("\n"), keyboard: kb(rows) };
 }
 
-export function dirsView({ items }) {
-  const rows = items.map((dir, index) => [
-    { text: `📁 ${clip(dir, 48)}`, callback_data: `nd:${index}` },
-  ]);
-  rows.push([{ text: "✖️ Отмена", callback_data: "home" }]);
-  return {
-    text: "<b>➕ Новая сессия</b>\nШаг 1/3. Выбери папку проекта.",
-    keyboard: kb(rows),
-  };
-}
-
 export function providersView({ items, prefix, title }) {
   const rows = items.map((item, index) => [
     {

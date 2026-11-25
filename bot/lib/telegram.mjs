@@ -1,11 +1,13 @@
-import { readFileSync, statSync } from "node:fs";
-import { basename } from "node:path";
+import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { basename, dirname } from "node:path";
 import { chunks, sleep } from "./format.mjs";
 
 const DOCUMENT_LIMIT = 50 * 1024 * 1024;
+const DOWNLOAD_LIMIT = 20 * 1024 * 1024;
 
 export class Telegram {
   constructor(token) {
+    this.token = token;
     this.base = `https://api.telegram.org/bot${token}`;
   }
 
@@ -129,6 +131,22 @@ export class Telegram {
       message_id: messageId,
       disable_notification: true,
     });
+  }
+
+  async getFile(fileId) {
+    return this.call("getFile", { file_id: fileId });
+  }
+
+  async download(filePath, destination) {
+    const response = await fetch(`https://api.telegram.org/file/bot${this.token}/${filePath}`, {
+      signal: AbortSignal.timeout(120000),
+    });
+    if (!response.ok) throw new Error(`download: HTTP ${response.status}`);
+    const buffer = Buffer.from(await response.arrayBuffer());
+    if (buffer.length > DOWNLOAD_LIMIT) throw new Error(`файл больше 20 МБ (${(buffer.length / 1024 ** 2).toFixed(1)} МБ)`);
+    mkdirSync(dirname(destination), { recursive: true });
+    writeFileSync(destination, buffer);
+    return { path: destination, size: buffer.length };
   }
 
   async getMe() {

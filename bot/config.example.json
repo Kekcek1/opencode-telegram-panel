@@ -2,7 +2,7 @@
   "botName": "OpenCode Panel",
   "allowedUsername": "your_telegram_username",
   "allowedId": null,
-  "defaultDirectory": "C:\\Users\\you",
+  "defaultDirectory": "C:\\Users\\you\\sessions",
   "sessionRoot": "C:\\Users\\you\\sessions",
   "defaultModel": {
     "providerID": "commandcode",
